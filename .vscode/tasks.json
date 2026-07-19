@@ -1,0 +1,62 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "ReJoy: Backend Dev",
+      "type": "shell",
+      "command": "cd \"C:\\Users\\User\\Documents\\New project\\backend\"; & \"C:\\Program Files\\nodejs\\npm.cmd\" run dev",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "ReJoy: Flutter Chrome",
+      "type": "shell",
+      "command": "cd \"C:\\Users\\User\\Documents\\New project\\rejoy\"; flutter run -d chrome",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "ReJoy: Check API",
+      "type": "shell",
+      "command": "powershell -ExecutionPolicy Bypass -File \"C:\\Users\\User\\Documents\\New project\\scripts\\check-rejoy-api.ps1\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "ReJoy: Check API Full Smoke",
+      "type": "shell",
+      "command": "powershell -ExecutionPolicy Bypass -File \"C:\\Users\\User\\Documents\\New project\\scripts\\check-rejoy-api.ps1\" -FullSmoke",
+      "problemMatcher": []
+    },
+    {
+      "label": "ReJoy: Stop Backend Port 3000",
+      "type": "shell",
+      "command": "powershell -ExecutionPolicy Bypass -File \"C:\\Users\\User\\Documents\\New project\\scripts\\stop-rejoy-backend-port.ps1\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "ReJoy: Build Mobile Demo APK",
+      "type": "shell",
+      "command": "powershell -ExecutionPolicy Bypass -File \"C:\\Users\\User\\Documents\\New project\\scripts\\build-rejoy-mobile-demo.ps1\" -ApiBaseUrl \"https://YOUR-REJOY-BACKEND.onrender.com\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "ReJoy: Build Web Demo",
+      "type": "shell",
+      "command": "powershell -ExecutionPolicy Bypass -File \"C:\\Users\\User\\Documents\\New project\\scripts\\build-rejoy-web-demo.ps1\" -ApiBaseUrl \"https://YOUR-REJOY-BACKEND.onrender.com\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "ReJoy: Prepare Demo Package",
+      "type": "shell",
+      "command": "powershell -ExecutionPolicy Bypass -File \"C:\\Users\\User\\Documents\\New project\\scripts\\prepare-rejoy-demo-package.ps1\" -ApiBaseUrl \"https://YOUR-REJOY-BACKEND.onrender.com\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "ReJoy: Start Full Demo",
+      "type": "shell",
+      "command": "powershell -ExecutionPolicy Bypass -File \"C:\\Users\\User\\Documents\\New project\\scripts\\start-rejoy-dev.ps1\"",
+      "isBackground": true,
+      "problemMatcher": []
+    }
+  ]
+}

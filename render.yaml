@@ -1,0 +1,47 @@
+services:
+  - type: web
+    name: rejoy-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGODB_URI
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: CORS_ORIGIN
+        value: "*"
+      - key: RATE_LIMIT_MAX
+        value: 300
+      - key: AUTH_RATE_LIMIT_MAX
+        value: 20
+      - key: HEALTH_CHECK_KEY
+        sync: false
+      - key: MONGODB_MAX_POOL_SIZE
+        value: 10
+      - key: MONGODB_MIN_POOL_SIZE
+        value: 1
+      - key: MONGODB_MAX_IDLE_TIME_MS
+        value: 60000
+      - key: MONGODB_WAIT_QUEUE_TIMEOUT_MS
+        value: 5000
+      - key: MONGODB_SERVER_SELECTION_TIMEOUT_MS
+        value: 8000
+      - key: MONGODB_SOCKET_TIMEOUT_MS
+        value: 30000
+      - key: MONGODB_CONNECT_TIMEOUT_MS
+        value: 10000
+      - key: MONGODB_HEARTBEAT_FREQUENCY_MS
+        value: 10000
+
