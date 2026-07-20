@@ -22,8 +22,10 @@ if (-not (git rev-parse --is-inside-work-tree 2>$null)) {
 
 git branch -M $Branch
 
-$existingRemote = git remote get-url origin 2>$null
-if ($LASTEXITCODE -eq 0 -and $existingRemote) {
+$existingRemote = $null
+$remoteList = git remote
+if ($remoteList -contains "origin") {
+  $existingRemote = git remote get-url origin
   git remote set-url origin $GitRemoteUrl
 } else {
   git remote add origin $GitRemoteUrl
