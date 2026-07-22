@@ -620,7 +620,7 @@ class ReJoyApiClient {
             'age': age,
           }),
         )
-        .timeout(const Duration(seconds: 10));
+        .timeout(const Duration(seconds: 45));
 
     clearCache();
     return _decodeJsonObject(
@@ -643,7 +643,7 @@ class ReJoyApiClient {
           },
           body: jsonEncode({'email': email, 'password': password}),
         )
-        .timeout(const Duration(seconds: 10));
+        .timeout(const Duration(seconds: 45));
 
     clearCache();
     return _decodeJsonObject(

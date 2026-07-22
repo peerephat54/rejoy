@@ -81,7 +81,10 @@ class _AuthScreenState extends State<AuthScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _message = 'ยังเข้าไม่ได้: $error';
+        final detail = error.toString().contains('TimeoutException')
+            ? 'เซิร์ฟเวอร์ฟรีกำลังตื่นอยู่ ลองกดอีกครั้งในอีกไม่กี่วินาทีนะ'
+            : error.toString();
+        _message = 'ยังเข้าไม่ได้: $detail';
         _loading = false;
       });
     }
