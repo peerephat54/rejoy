@@ -43,6 +43,7 @@ class _ReJoyAuthGateState extends State<ReJoyAuthGate> {
   bool _signedIn = AuthSession.isSignedIn;
   bool? _consentAccepted;
   bool _onboardingFinishedThisSession = false;
+  bool _openSosAfterOnboarding = false;
   Future<ClinicalProfilePayload>? _profileFuture;
 
   @override
@@ -77,6 +78,7 @@ class _ReJoyAuthGateState extends State<ReJoyAuthGate> {
             _signedIn = true;
             _consentAccepted = accepted;
             _onboardingFinishedThisSession = false;
+            _openSosAfterOnboarding = false;
             _profileFuture = _client.fetchActiveClinicalProfile(
               forceRefresh: true,
             );
@@ -135,6 +137,11 @@ class _ReJoyAuthGateState extends State<ReJoyAuthGate> {
           if (!user.onboardingComplete) {
             return ConversationalOnboardingScreen(
               user: user,
+              onSafetyEscalation: (level) {
+                if (level == ClinicalRiskLevel.red) {
+                  _openSosAfterOnboarding = true;
+                }
+              },
               onFinished: () {
                 setState(() {
                   _onboardingFinishedThisSession = true;
@@ -147,9 +154,11 @@ class _ReJoyAuthGateState extends State<ReJoyAuthGate> {
           }
 
           return ReJoyShell(
+            initialIndex: _openSosAfterOnboarding ? 4 : 0,
             onSignedOut: () => setState(() {
               _signedIn = false;
               _onboardingFinishedThisSession = false;
+              _openSosAfterOnboarding = false;
               _profileFuture = null;
             }),
           );
@@ -158,9 +167,11 @@ class _ReJoyAuthGateState extends State<ReJoyAuthGate> {
     }
 
     return ReJoyShell(
+      initialIndex: _openSosAfterOnboarding ? 4 : 0,
       onSignedOut: () => setState(() {
         _signedIn = false;
         _onboardingFinishedThisSession = false;
+        _openSosAfterOnboarding = false;
         _profileFuture = null;
       }),
     );
@@ -328,9 +339,14 @@ class _ConsentBullet extends StatelessWidget {
 }
 
 class ReJoyShell extends StatefulWidget {
-  const ReJoyShell({super.key, required this.onSignedOut});
+  const ReJoyShell({
+    super.key,
+    required this.onSignedOut,
+    this.initialIndex = 0,
+  });
 
   final VoidCallback onSignedOut;
+  final int initialIndex;
 
   @override
   State<ReJoyShell> createState() => _ReJoyShellState();
@@ -340,7 +356,18 @@ class _ReJoyShellState extends State<ReJoyShell> {
   final ReJoySession session = ReJoySession.seed();
   final AuditLogService _auditLog = const AuditLogService();
   final Map<int, Widget> _pageCache = {};
-  int selectedIndex = 0;
+  late int selectedIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    selectedIndex = widget.initialIndex;
+    if (selectedIndex == 4) {
+      session.crisis = CrisisLevel.urgent;
+      session.mood = MoodState.crisis;
+      session.energy = EnergyLevel.low;
+    }
+  }
 
   void _setMood(MoodState mood) {
     setState(() {

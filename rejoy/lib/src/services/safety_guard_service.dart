@@ -18,17 +18,17 @@ class SafetyGuardService {
   const SafetyGuardService();
 
   static final RegExp _redFlagPattern = RegExp(
-    r'(อยากตาย|ฆ่าตัวตาย|ทำร้ายตัวเอง|ไม่อยากอยู่|หายไปตลอด|suicide|kill myself|end my life|self harm)',
+    r'(อยากตาย|ฆ่าตัวตาย|ทำร้ายตัวเอง|ไม่อยากอยู่|ไม่อยากมีชีวิต|จบชีวิต|อยากหายไปตลอด|suicide|kill myself|end my life|self harm)',
     caseSensitive: false,
   );
 
   static final RegExp _orangePattern = RegExp(
-    r'(ไม่ไหวแล้ว|หมดหวัง|ไม่เหลือใคร|อยากหายไป|เจ็บปวดมาก|ทรมานมาก)',
+    r'(ไม่ไหวแล้ว|หมดหวัง|ไม่เหลือใคร|เจ็บปวดมาก|ทรมานมาก|พังมาก|ดิ่งมาก)',
     caseSensitive: false,
   );
 
   static final RegExp _yellowPattern = RegExp(
-    r'(เครียด|เหนื่อย|เศร้า|กังวล|นอนไม่หลับ|ร้องไห้|โดดเดี่ยว)',
+    r'(เครียด|เหนื่อย|เศร้า|กังวล|นอนไม่หลับ|ร้องไห้|โดดเดี่ยว|เหงา)',
     caseSensitive: false,
   );
 
