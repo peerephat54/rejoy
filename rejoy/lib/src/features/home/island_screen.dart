@@ -56,21 +56,11 @@ class _IslandScreenState extends State<IslandScreen>
       final latestReport = profile.reports.isEmpty
           ? null
           : profile.reports.first;
-      final demoAnimals =
-          profile.user.email.endsWith('@rejoy.demo') &&
-              profile.user.unlockedAnimals.isEmpty
-          ? const [
-              'panda-demo',
-              'red-panda-demo',
-              'capybara-demo',
-              'koala-demo',
-            ]
-          : profile.user.unlockedAnimals.take(8).toList();
       return _IslandData(
         user: profile.user,
         phq9Score:
             latestReport?.phq9Score ?? profile.user.completedQuestsCount % 9,
-        animals: demoAnimals,
+        animals: profile.user.unlockedAnimals.take(8).toList(),
         animalNicknames: profile.user.animalNicknames,
         backendOnline: true,
         backendLabel: 'DB connected',
@@ -249,6 +239,15 @@ class _IslandScreenState extends State<IslandScreen>
                                       ),
                                     ),
                                     ..._animalWidgets(data, weather),
+                                    if (data.animals.isEmpty)
+                                      Positioned(
+                                        left: 28,
+                                        right: 28,
+                                        bottom: 82,
+                                        child: _EmptyAnimalGuide(
+                                          weather: weather,
+                                        ),
+                                      ),
                                     Positioned.fill(
                                       child: IgnorePointer(
                                         child: RepaintBoundary(
@@ -1034,6 +1033,62 @@ class _AnimalSprite extends StatelessWidget {
           fit: BoxFit.contain,
           filterQuality: FilterQuality.high,
         ),
+      ),
+    );
+  }
+}
+
+class _EmptyAnimalGuide extends StatelessWidget {
+  const _EmptyAnimalGuide({required this.weather});
+
+  final _IslandWeather weather;
+
+  @override
+  Widget build(BuildContext context) {
+    final stormy =
+        weather.kind == _WeatherKind.rain || weather.kind == _WeatherKind.storm;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 360),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: stormy ? 0.82 : 0.70),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.82)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF284D55).withValues(alpha: 0.14),
+            blurRadius: 18,
+            offset: const Offset(0, 9),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE7F6F1),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(
+              Icons.pets_rounded,
+              color: Color(0xFF5F9B91),
+              size: 23,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'ทำภารกิจเล็ก ๆ ให้ครบ แล้วสัตว์ตัวแรกจะค่อย ๆ เข้ามาพักอาศัยบนเกาะของคุณ',
+              style: TextStyle(
+                color: Color(0xFF24474E),
+                fontWeight: FontWeight.w800,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
