@@ -56,11 +56,21 @@ class _IslandScreenState extends State<IslandScreen>
       final latestReport = profile.reports.isEmpty
           ? null
           : profile.reports.first;
+      final demoAnimals =
+          profile.user.email.endsWith('@rejoy.demo') &&
+              profile.user.unlockedAnimals.isEmpty
+          ? const [
+              'panda-demo',
+              'red-panda-demo',
+              'capybara-demo',
+              'koala-demo',
+            ]
+          : profile.user.unlockedAnimals.take(8).toList();
       return _IslandData(
         user: profile.user,
         phq9Score:
             latestReport?.phq9Score ?? profile.user.completedQuestsCount % 9,
-        animals: profile.user.unlockedAnimals.take(8).toList(),
+        animals: demoAnimals,
         animalNicknames: profile.user.animalNicknames,
         backendOnline: true,
         backendLabel: 'DB connected',
@@ -702,40 +712,30 @@ class _ChatBotPortalButton extends StatelessWidget {
               alignment: Alignment.center,
               children: [
                 Container(
-                  width: 46,
-                  height: 32,
+                  width: 58,
+                  height: 58,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF527786),
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _botEye(progress, 0),
-                      const SizedBox(width: 8),
-                      _botEye(progress, 0.2),
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withValues(alpha: 0.92),
+                        const Color(0xFFE5FBFF).withValues(alpha: 0.86),
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF4F8791).withValues(alpha: 0.20),
+                        blurRadius: 12,
+                        offset: const Offset(0, 6),
+                      ),
                     ],
                   ),
-                ),
-                Positioned(
-                  top: 5,
-                  child: Container(
-                    width: 4,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF91B7AF),
-                      borderRadius: BorderRadius.circular(99),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: 1,
-                  child: Container(
-                    width: 10,
-                    height: 10,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFB7E5D1),
-                      shape: BoxShape.circle,
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Image.asset(
+                      'assets/images/island_parts/rejoy_bot.png',
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
                     ),
                   ),
                 ),
@@ -743,19 +743,6 @@ class _ChatBotPortalButton extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _botEye(double progress, double phase) {
-    final blink = math.sin((progress + phase) * math.pi * 2) > 0.92;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 150),
-      width: 7,
-      height: blink ? 2 : 7,
-      decoration: BoxDecoration(
-        color: const Color(0xFFBDF8F2),
-        borderRadius: BorderRadius.circular(99),
       ),
     );
   }
@@ -1026,11 +1013,27 @@ class _AnimalSprite extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 56,
-      height: 56,
-      child: CustomPaint(
-        painter: _AnimalPainter(animal: animal, sleepy: sleepy),
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 260),
+      opacity: sleepy ? 0.72 : 1,
+      child: Container(
+        width: animal.size,
+        height: animal.size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF23464D).withValues(alpha: 0.16),
+              blurRadius: 12,
+              offset: const Offset(0, 7),
+            ),
+          ],
+        ),
+        child: Image.asset(
+          animal.assetPath,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.high,
+        ),
       ),
     );
   }
@@ -1682,97 +1685,6 @@ class _IslandReflectionPainter extends CustomPainter {
   }
 }
 
-class _AnimalPainter extends CustomPainter {
-  const _AnimalPainter({required this.animal, required this.sleepy});
-
-  final _PastelAnimal animal;
-  final bool sleepy;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final body = Paint()..color = animal.color;
-    final blush = Paint()..color = Colors.white.withValues(alpha: 0.42);
-    final line = Paint()
-      ..color = const Color(0xFF3F4E55)
-      ..strokeWidth = 2.2
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: center + const Offset(0, 6),
-        width: 42,
-        height: 34,
-      ),
-      body,
-    );
-    canvas.drawCircle(center + const Offset(0, -8), 21, body);
-    canvas.drawCircle(center + const Offset(-10, -23), 9, body);
-    canvas.drawCircle(center + const Offset(10, -23), 9, body);
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: center + const Offset(0, -4),
-        width: 24,
-        height: 14,
-      ),
-      blush,
-    );
-
-    if (sleepy) {
-      canvas.drawLine(
-        center + const Offset(-9, -10),
-        center + const Offset(-3, -8),
-        line,
-      );
-      canvas.drawLine(
-        center + const Offset(3, -8),
-        center + const Offset(9, -10),
-        line,
-      );
-      final zPaint = Paint()
-        ..color = const Color(0xFF52656B)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2;
-      canvas.drawPath(
-        Path()
-          ..moveTo(center.dx + 15, center.dy - 26)
-          ..lineTo(center.dx + 25, center.dy - 26)
-          ..lineTo(center.dx + 15, center.dy - 16)
-          ..lineTo(center.dx + 25, center.dy - 16),
-        zPaint,
-      );
-    } else {
-      canvas.drawCircle(center + const Offset(-7, -10), 2.5, line);
-      canvas.drawCircle(center + const Offset(7, -10), 2.5, line);
-      canvas.drawArc(
-        Rect.fromCenter(
-          center: center + const Offset(0, -5),
-          width: 12,
-          height: 10,
-        ),
-        0.2,
-        math.pi - 0.4,
-        false,
-        line,
-      );
-    }
-
-    final textPainter = TextPainter(
-      text: TextSpan(text: animal.emoji, style: const TextStyle(fontSize: 12)),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    textPainter.paint(
-      canvas,
-      Offset(center.dx - textPainter.width / 2, center.dy + 10),
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _AnimalPainter oldDelegate) {
-    return oldDelegate.sleepy != sleepy || oldDelegate.animal != animal;
-  }
-}
-
 class _AnimalNameTag extends StatelessWidget {
   const _AnimalNameTag({required this.name});
 
@@ -1996,83 +1908,67 @@ class _IslandData {
 class _PastelAnimal {
   const _PastelAnimal({
     required this.name,
-    required this.emoji,
-    required this.color,
+    required this.assetPath,
+    required this.size,
   });
 
   final String name;
-  final String emoji;
-  final Color color;
+  final String assetPath;
+  final double size;
 
   static _PastelAnimal fromId(String id, int index) {
     final normalized = id.toLowerCase();
-    if (normalized.contains('fox')) {
+    if (normalized.contains('red') || normalized.contains('fox')) {
       return const _PastelAnimal(
-        name: 'fox',
-        emoji: '🦊',
-        color: Color(0xFFFFB085),
+        name: 'อ้วนแดง',
+        assetPath: 'assets/images/island_parts/animal_red_panda.png',
+        size: 72,
       );
     }
-    if (normalized.contains('owl')) {
+    if (normalized.contains('capy') || normalized.contains('otter')) {
       return const _PastelAnimal(
-        name: 'owl',
-        emoji: '🦉',
-        color: Color(0xFFC7B8EA),
+        name: 'คาปิลิ้นเปื่อย',
+        assetPath: 'assets/images/island_parts/animal_capybara.png',
+        size: 76,
       );
     }
-    if (normalized.contains('otter')) {
+    if (normalized.contains('koala')) {
       return const _PastelAnimal(
-        name: 'otter',
-        emoji: '🦦',
-        color: Color(0xFFB89472),
-      );
-    }
-    if (normalized.contains('deer')) {
-      return const _PastelAnimal(
-        name: 'deer',
-        emoji: '🦌',
-        color: Color(0xFFD8B18C),
-      );
-    }
-    if (normalized.contains('lion')) {
-      return const _PastelAnimal(
-        name: 'lion',
-        emoji: '🦁',
-        color: Color(0xFFF4C66E),
-      );
-    }
-    if (normalized.contains('rabbit')) {
-      return const _PastelAnimal(
-        name: 'rabbit',
-        emoji: '🐰',
-        color: Color(0xFFEFC7D8),
-      );
-    }
-    if (normalized.contains('turtle')) {
-      return const _PastelAnimal(
-        name: 'turtle',
-        emoji: '🐢',
-        color: Color(0xFF95D3A2),
+        name: 'อ้วน',
+        assetPath: 'assets/images/island_parts/animal_koala.png',
+        size: 70,
       );
     }
     if (normalized.contains('panda')) {
       return const _PastelAnimal(
-        name: 'panda',
-        emoji: '🐼',
-        color: Color(0xFFE8E8E8),
+        name: 'แพนแพน',
+        assetPath: 'assets/images/island_parts/animal_panda.png',
+        size: 72,
       );
     }
-    const colors = [
-      Color(0xFFA8DADC),
-      Color(0xFFFFC8DD),
-      Color(0xFFCDB4DB),
-      Color(0xFFFFD6A5),
+    const fallback = [
+      _PastelAnimal(
+        name: 'แพนแพน',
+        assetPath: 'assets/images/island_parts/animal_panda.png',
+        size: 72,
+      ),
+      _PastelAnimal(
+        name: 'อ้วนแดง',
+        assetPath: 'assets/images/island_parts/animal_red_panda.png',
+        size: 72,
+      ),
+      _PastelAnimal(
+        name: 'คาปิลิ้นเปื่อย',
+        assetPath: 'assets/images/island_parts/animal_capybara.png',
+        size: 76,
+      ),
+      _PastelAnimal(
+        name: 'อ้วน',
+        assetPath: 'assets/images/island_parts/animal_koala.png',
+        size: 70,
+      ),
     ];
-    return _PastelAnimal(
-      name: id,
-      emoji: '🐾',
-      color: colors[index % colors.length],
-    );
+    return fallback[index % fallback.length];
   }
 }
 
