@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../core/api_config.dart';
 import '../../core/auth_session.dart';
 import '../../services/rejoy_api_client.dart';
 
@@ -18,9 +17,6 @@ class _AuthScreenState extends State<AuthScreen> {
   static const _authMutedTextColor = Color(0xFF53666E);
   static const _authBorderColor = Color(0xFF8CA0AA);
 
-  final _apiController = TextEditingController(
-    text: ApiConfig.configuredBaseUrl,
-  );
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _firstNameController = TextEditingController(text: 'ReJoy');
@@ -34,7 +30,6 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   void dispose() {
-    _apiController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _firstNameController.dispose();
@@ -45,17 +40,11 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> _submit() async {
-    final apiUrl = _apiController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text;
-    if (!apiUrl.startsWith(RegExp(r'https?://'))) {
-      setState(
-        () => _message = 'API URL ต้องขึ้นต้นด้วย http:// หรือ https://',
-      );
-      return;
-    }
+
     if (email.isEmpty || password.length < 8) {
-      setState(() => _message = 'ใส่อีเมล และรหัสผ่านอย่างน้อย 8 ตัวอักษร');
+      setState(() => _message = 'ใส่อีเมลและรหัสผ่านอย่างน้อย 8 ตัวอักษรนะ');
       return;
     }
 
@@ -65,7 +54,6 @@ class _AuthScreenState extends State<AuthScreen> {
     });
 
     try {
-      await ApiConfig.saveBaseUrlOverride(apiUrl);
       ReJoyApiClient.clearCache();
       final result = _registerMode
           ? await _client.registerWithEmail(
@@ -114,41 +102,45 @@ class _AuthScreenState extends State<AuthScreen> {
           child: ListView(
             padding: const EdgeInsets.all(22),
             children: [
-              const SizedBox(height: 24),
+              const SizedBox(height: 28),
               const Text(
                 'ReJoy',
                 style: TextStyle(
-                  color: Color(0xFF17343C),
-                  fontSize: 42,
+                  color: _authTextColor,
+                  fontSize: 46,
                   fontWeight: FontWeight.w900,
+                  letterSpacing: -1.2,
                 ),
               ),
               const SizedBox(height: 8),
               const Text(
                 'ล็อกอินด้วยอีเมลเพื่อเก็บข้อมูลสุขภาพใจของคุณอย่างเป็นส่วนตัว',
-                style: TextStyle(color: Color(0xFF607A81), height: 1.4),
+                style: TextStyle(
+                  color: Color(0xFF607A81),
+                  height: 1.4,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 24),
               _card(
                 children: [
                   TextField(
-                    controller: _apiController,
-                    keyboardType: TextInputType.url,
-                    decoration: const InputDecoration(
-                      labelText: 'Backend / Cloud API URL',
-                      hintText: 'https://rejoy-backend.onrender.com',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
+                    style: const TextStyle(
+                      color: _authTextColor,
+                      fontWeight: FontWeight.w800,
+                    ),
                     decoration: const InputDecoration(labelText: 'Email'),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _passwordController,
                     obscureText: true,
+                    style: const TextStyle(
+                      color: _authTextColor,
+                      fontWeight: FontWeight.w800,
+                    ),
                     decoration: const InputDecoration(
                       labelText: 'Password',
                       helperText: 'อย่างน้อย 8 ตัวอักษร',
@@ -158,21 +150,33 @@ class _AuthScreenState extends State<AuthScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: _firstNameController,
+                      style: const TextStyle(
+                        color: _authTextColor,
+                        fontWeight: FontWeight.w800,
+                      ),
                       decoration: const InputDecoration(labelText: 'ชื่อ'),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _surnameController,
+                      style: const TextStyle(
+                        color: _authTextColor,
+                        fontWeight: FontWeight.w800,
+                      ),
                       decoration: const InputDecoration(labelText: 'นามสกุล'),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _ageController,
                       keyboardType: TextInputType.number,
+                      style: const TextStyle(
+                        color: _authTextColor,
+                        fontWeight: FontWeight.w800,
+                      ),
                       decoration: const InputDecoration(labelText: 'อายุ'),
                     ),
                   ],
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
@@ -207,7 +211,8 @@ class _AuthScreenState extends State<AuthScreen> {
                       _message!,
                       style: const TextStyle(
                         color: Color(0xFF31525A),
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w800,
+                        height: 1.35,
                       ),
                     ),
                 ],
@@ -223,7 +228,7 @@ class _AuthScreenState extends State<AuthScreen> {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.86),
+        color: Colors.white.withValues(alpha: 0.90),
         borderRadius: BorderRadius.circular(26),
         border: Border.all(color: Colors.white),
         boxShadow: [
@@ -262,6 +267,13 @@ class _AuthScreenState extends State<AuthScreen> {
             ),
             focusedBorder: const UnderlineInputBorder(
               borderSide: BorderSide(color: _authTextColor, width: 1.9),
+            ),
+          ),
+          filledButtonTheme: FilledButtonThemeData(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFA8BEFF),
+              foregroundColor: _authTextColor,
+              textStyle: const TextStyle(fontWeight: FontWeight.w900),
             ),
           ),
           textButtonTheme: TextButtonThemeData(
