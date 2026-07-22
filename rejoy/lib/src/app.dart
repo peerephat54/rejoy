@@ -37,7 +37,8 @@ class ReJoyAuthGate extends StatefulWidget {
   State<ReJoyAuthGate> createState() => _ReJoyAuthGateState();
 }
 
-class _ReJoyAuthGateState extends State<ReJoyAuthGate> {
+class _ReJoyAuthGateState extends State<ReJoyAuthGate>
+    with WidgetsBindingObserver {
   final ReJoyApiClient _client = ReJoyApiClient();
   final AuditLogService _auditLog = const AuditLogService();
   bool _signedIn = AuthSession.isSignedIn;
@@ -49,6 +50,7 @@ class _ReJoyAuthGateState extends State<ReJoyAuthGate> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadConsent();
     if (_signedIn) {
       _profileFuture = _client.fetchActiveClinicalProfile(forceRefresh: true);
@@ -57,8 +59,37 @@ class _ReJoyAuthGateState extends State<ReJoyAuthGate> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _client.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _enforceSessionTimeout();
+    } else if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      AuthSession.touch();
+    }
+  }
+
+  Future<void> _enforceSessionTimeout() async {
+    if (!AuthSession.isSignedIn) return;
+    if (!await AuthSession.isExpired()) {
+      await AuthSession.touch();
+      return;
+    }
+    await AuthSession.clear();
+    ReJoyApiClient.clearCache();
+    if (!mounted) return;
+    setState(() {
+      _signedIn = false;
+      _onboardingFinishedThisSession = false;
+      _openSosAfterOnboarding = false;
+      _profileFuture = null;
+    });
   }
 
   Future<void> _loadConsent() async {

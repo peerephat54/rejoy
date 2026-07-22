@@ -90,6 +90,61 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  Future<void> _loginWithDemo() async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final email = 'demo-$now@rejoy.demo';
+    const password = 'ReJoyDemo123!';
+
+    setState(() {
+      _loading = true;
+      _message = 'กำลังเตรียมบัญชี Demo ใหม่...';
+    });
+
+    try {
+      ReJoyApiClient.clearCache();
+      final result = await _client.registerWithEmail(
+        email: email,
+        password: password,
+        firstName: 'Demo',
+        surname: 'ReJoy',
+        age: 16,
+      );
+
+      await AuthSession.save(
+        token: result.token,
+        refreshToken: result.refreshToken,
+        userId: result.user.id,
+        email: result.user.email.isEmpty ? email : result.user.email,
+      );
+
+      await _client.updateUserProfile(
+        userId: result.user.id,
+        firstName: 'Demo',
+        surname: 'ReJoy',
+        age: 16,
+        allergies: const [],
+        emergencyContactNumbers: const [],
+        currentMedications: const [],
+        medicalHistory: 'Demo account for ReJoy presentation',
+        onboardingComplete: true,
+      );
+      await _client.appendPhq9Log(userId: result.user.id, totalScore: 4);
+      await _client.appendMoodLog(userId: result.user.id, moodLevel: 8);
+
+      if (!mounted) return;
+      widget.onSignedIn();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        final detail = error.toString().contains('TimeoutException')
+            ? 'เซิร์ฟเวอร์ฟรีกำลังตื่นอยู่ ลองกด Demo อีกครั้งในอีกไม่กี่วินาทีนะ'
+            : error.toString();
+        _message = 'ยังเข้า Demo ไม่ได้: $detail';
+        _loading = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -194,6 +249,15 @@ class _AuthScreenState extends State<AuthScreen> {
                       label: Text(
                         _registerMode ? 'สมัครสมาชิก' : 'เข้าสู่ระบบ',
                       ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _loading ? null : _loginWithDemo,
+                      icon: const Icon(Icons.science_rounded),
+                      label: const Text('เข้าสู่ระบบแบบ Demo'),
                     ),
                   ),
                   TextButton(
