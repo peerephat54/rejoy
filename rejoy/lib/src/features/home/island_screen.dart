@@ -30,6 +30,7 @@ class _IslandScreenState extends State<IslandScreen>
   late final ReJoyApiClient _client;
   late final AnimationController _controller;
   Future<_IslandData>? _islandFuture;
+  int? _demoWeatherScore;
 
   @override
   void initState() {
@@ -86,6 +87,13 @@ class _IslandScreenState extends State<IslandScreen>
     };
   }
 
+  void _selectDemoWeather(_WeatherPreset preset) {
+    widget.onMoodSelected(preset.mood);
+    setState(() {
+      _demoWeatherScore = preset.phq9Score;
+    });
+  }
+
   Future<void> _refresh() async {
     setState(() {
       _islandFuture = _loadIsland();
@@ -108,12 +116,15 @@ class _IslandScreenState extends State<IslandScreen>
               backendOnline: false,
               backendLabel: 'loading island',
             );
-        final weather = _IslandWeather.fromPhq9(data.phq9Score);
+        final displayPhq9Score = _demoWeatherScore ?? data.phq9Score;
+        final weather = _IslandWeather.fromPhq9(displayPhq9Score);
 
         return AnimatedBuilder(
           animation: _controller,
           builder: (context, _) {
-            return Container(
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 900),
+              curve: Curves.easeInOutCubic,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
@@ -153,89 +164,107 @@ class _IslandScreenState extends State<IslandScreen>
                             ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(34),
-                              child: Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  Positioned.fill(
-                                    child: RepaintBoundary(
-                                      child: CustomPaint(
-                                        painter: _IslandPainter(
-                                          weather: weather,
-                                          progress: _controller.value,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  Positioned.fill(
-                                    child: LayoutBuilder(
-                                      builder: (context, constraints) {
-                                        final bob =
-                                            math.sin(
-                                              _controller.value * math.pi * 2,
-                                            ) *
-                                            4;
-                                        return Align(
-                                          alignment: const Alignment(0, 0.08),
-                                          child: Transform.translate(
-                                            offset: Offset(0, bob),
-                                            child: _IslandAsset(
-                                              width:
-                                                  constraints.maxWidth * 1.16,
-                                              weather: weather,
-                                              progress: _controller.value,
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                  Positioned(
-                                    top: 58,
-                                    left: -44,
-                                    right: -44,
-                                    child: _GloomyCloudCanopy(
-                                      progress: _controller.value,
-                                      weather: weather,
-                                    ),
-                                  ),
-                                  Positioned(
-                                    top: 22,
-                                    left: 0,
-                                    right: 0,
-                                    child: _IslandSceneTitle(weather: weather),
-                                  ),
-                                  Positioned(
-                                    top: 108,
-                                    left: 24,
-                                    child: _ChatBotPortalButton(
-                                      progress: _controller.value,
-                                      onPressed: widget.onChatSelected,
-                                    ),
-                                  ),
-                                  Positioned(
-                                    top: 82,
-                                    right: 30,
-                                    child: _LighthousePortalButton(
-                                      progress: _controller.value,
-                                      onPressed: widget.onSosSelected,
-                                    ),
-                                  ),
-                                  ..._animalWidgets(data, weather),
-                                  Positioned.fill(
-                                    child: IgnorePointer(
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 650),
+                                switchInCurve: Curves.easeOutCubic,
+                                switchOutCurve: Curves.easeInCubic,
+                                child: Stack(
+                                  key: ValueKey(weather.kind),
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    Positioned.fill(
                                       child: RepaintBoundary(
                                         child: CustomPaint(
-                                          painter: _FrontWeatherPainter(
+                                          painter: _IslandPainter(
                                             weather: weather,
                                             progress: _controller.value,
                                           ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                    Positioned.fill(
+                                      child: LayoutBuilder(
+                                        builder: (context, constraints) {
+                                          final bob =
+                                              math.sin(
+                                                _controller.value * math.pi * 2,
+                                              ) *
+                                              4;
+                                          return Align(
+                                            alignment: const Alignment(0, 0.08),
+                                            child: Transform.translate(
+                                              offset: Offset(0, bob),
+                                              child: _IslandAsset(
+                                                width:
+                                                    constraints.maxWidth * 1.16,
+                                                weather: weather,
+                                                progress: _controller.value,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    Positioned(
+                                      top: 58,
+                                      left: -44,
+                                      right: -44,
+                                      child: _GloomyCloudCanopy(
+                                        progress: _controller.value,
+                                        weather: weather,
+                                      ),
+                                    ),
+                                    Positioned(
+                                      top: 22,
+                                      left: 0,
+                                      right: 0,
+                                      child: _IslandSceneTitle(
+                                        weather: weather,
+                                      ),
+                                    ),
+                                    Positioned(
+                                      top: 108,
+                                      left: 24,
+                                      child: _ChatBotPortalButton(
+                                        progress: _controller.value,
+                                        onPressed: widget.onChatSelected,
+                                      ),
+                                    ),
+                                    Positioned(
+                                      top: 82,
+                                      right: 30,
+                                      child: _LighthousePortalButton(
+                                        progress: _controller.value,
+                                        onPressed: widget.onSosSelected,
+                                      ),
+                                    ),
+                                    ..._animalWidgets(data, weather),
+                                    Positioned.fill(
+                                      child: IgnorePointer(
+                                        child: RepaintBoundary(
+                                          child: CustomPaint(
+                                            painter: _FrontWeatherPainter(
+                                              weather: weather,
+                                              progress: _controller.value,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 390),
+                          child: _WeatherModePicker(
+                            selectedScore: displayPhq9Score,
+                            onSelected: _selectDemoWeather,
                           ),
                         ),
                       ),
@@ -1769,6 +1798,169 @@ class _AnimalNameTag extends StatelessWidget {
       ),
     );
   }
+}
+
+class _WeatherModePicker extends StatelessWidget {
+  const _WeatherModePicker({
+    required this.selectedScore,
+    required this.onSelected,
+  });
+
+  final int selectedScore;
+  final ValueChanged<_WeatherPreset> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.58),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.68)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF42646B).withValues(alpha: 0.10),
+            blurRadius: 22,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final preset in _WeatherPreset.values)
+            _WeatherChip(
+              preset: preset,
+              selected: preset.matches(selectedScore),
+              onTap: () => onSelected(preset),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WeatherChip extends StatelessWidget {
+  const _WeatherChip({
+    required this.preset,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _WeatherPreset preset;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedScale(
+      duration: const Duration(milliseconds: 180),
+      scale: selected ? 1.04 : 1,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(999),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            decoration: BoxDecoration(
+              color: selected
+                  ? preset.color.withValues(alpha: 0.95)
+                  : Colors.white.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: selected
+                    ? Colors.white.withValues(alpha: 0.86)
+                    : preset.color.withValues(alpha: 0.28),
+              ),
+              boxShadow: selected
+                  ? [
+                      BoxShadow(
+                        color: preset.color.withValues(alpha: 0.30),
+                        blurRadius: 14,
+                        offset: const Offset(0, 7),
+                      ),
+                    ]
+                  : const [],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  preset.icon,
+                  size: 17,
+                  color: selected ? Colors.white : preset.color,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  preset.label,
+                  style: TextStyle(
+                    color: selected ? Colors.white : const Color(0xFF294B52),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WeatherPreset {
+  const _WeatherPreset({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.phq9Score,
+    required this.mood,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+  final int phq9Score;
+  final MoodState mood;
+
+  bool matches(int score) => _IslandWeather.fromPhq9(score).kind == weatherKind;
+
+  _WeatherKind get weatherKind => _IslandWeather.fromPhq9(phq9Score).kind;
+
+  static const values = [
+    _WeatherPreset(
+      label: 'แดดอ่อน',
+      icon: Icons.wb_sunny_rounded,
+      color: Color(0xFFE3AD42),
+      phq9Score: 4,
+      mood: MoodState.hopeful,
+    ),
+    _WeatherPreset(
+      label: 'เมฆนุ่ม',
+      icon: Icons.cloud_rounded,
+      color: Color(0xFF7FAEBA),
+      phq9Score: 11,
+      mood: MoodState.tired,
+    ),
+    _WeatherPreset(
+      label: 'ฝนหนัก',
+      icon: Icons.water_drop_rounded,
+      color: Color(0xFF668CA2),
+      phq9Score: 16,
+      mood: MoodState.heavy,
+    ),
+    _WeatherPreset(
+      label: 'พายุ',
+      icon: Icons.thunderstorm_rounded,
+      color: Color(0xFF59677D),
+      phq9Score: 23,
+      mood: MoodState.crisis,
+    ),
+  ];
 }
 
 class _IslandData {

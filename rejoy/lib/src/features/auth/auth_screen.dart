@@ -122,14 +122,52 @@ class _AuthScreenState extends State<AuthScreen> {
         firstName: 'Demo',
         surname: 'ReJoy',
         age: 16,
-        allergies: const [],
-        emergencyContactNumbers: const [],
-        currentMedications: const [],
-        medicalHistory: 'Demo account for ReJoy presentation',
+        allergies: const ['ข้อมูลจำลอง: ไม่มีข้อมูลแพ้ยาที่ระบุ'],
+        emergencyContactNumbers: const ['ข้อมูลจำลอง: 08X-XXX-XXXX'],
+        currentMedications: const [
+          'ข้อมูลจำลอง: อยู่ระหว่างติดตามโดยผู้เชี่ยวชาญ',
+        ],
+        medicalHistory:
+            'ข้อมูลจำลองสำหรับสาธิต: ผู้ใช้ภาวะซึมเศร้าระดับรุนแรง ใช้โชว์ workflow รายงานแพทย์เท่านั้น',
         onboardingComplete: true,
       );
-      await _client.appendPhq9Log(userId: result.user.id, totalScore: 4);
-      await _client.appendMoodLog(userId: result.user.id, moodLevel: 8);
+      await _client.appendPhq9Log(userId: result.user.id, totalScore: 23);
+      await _client.appendMoodLog(userId: result.user.id, moodLevel: 2);
+      await _client.appendSymptomMatrixLog(
+        userId: result.user.id,
+        moodScore: 9,
+        somaticScore: 8,
+        behavioralScore: 7,
+      );
+      final today = DateTime.now();
+      final demoReports = [
+        (daysAgo: 4, phq9: 19, mood: 'หม่นมาก', cbt: '1/5', sos: false),
+        (daysAgo: 3, phq9: 21, mood: 'เหนื่อยล้า', cbt: '0/5', sos: false),
+        (daysAgo: 2, phq9: 22, mood: 'โดดเดี่ยว', cbt: '1/5', sos: true),
+        (daysAgo: 1, phq9: 23, mood: 'หนักมาก', cbt: '0/5', sos: true),
+        (daysAgo: 0, phq9: 23, mood: 'ซึมเศร้ารุนแรง', cbt: '1/5', sos: true),
+      ];
+      for (final report in demoReports) {
+        await _client.createReportForUser(
+          userId: result.user.id,
+          phq9Score: report.phq9,
+          symptomMatrix: const {
+            'mood_score': 9,
+            'somatic_score': 8,
+            'behavioral_score': 7,
+          },
+          dailyMood: 'ข้อมูลจำลอง: ${report.mood}',
+          diaryNote:
+              'ข้อมูลจำลองสำหรับสาธิต: วันนี้รู้สึกหนัก เหนื่อยง่าย นอนหลับยาก และไม่ค่อยอยากทำกิจกรรม ต้องการให้แพทย์เห็นแนวโน้มโดยไม่ต้องเล่าย้อนหลังทั้งหมด',
+          cbtCompletionRate: report.cbt,
+          unlockedAnimalToday: report.sos
+              ? 'owl-urgent-demo'
+              : 'otter-care-demo',
+          isRestDay: report.cbt == '0/5',
+          isSosTriggered: report.sos,
+          date: today.subtract(Duration(days: report.daysAgo)),
+        );
+      }
 
       if (!mounted) return;
       widget.onSignedIn();

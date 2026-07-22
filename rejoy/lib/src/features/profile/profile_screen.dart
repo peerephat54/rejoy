@@ -331,8 +331,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onExportPdf: () => _exportDoctorPdf(data),
                     exportingPdf: _exportingPdf,
                   ),
-                  const SizedBox(height: 14),
-                  const _TictaReadinessCard(),
                   if (_statusMessage != null) ...[
                     const SizedBox(height: 12),
                     _StatusCard(title: 'สถานะ', subtitle: _statusMessage!),
@@ -596,100 +594,6 @@ class _ApiSettingsCardState extends State<_ApiSettingsCard> {
   }
 }
 
-class _TictaReadinessCard extends StatelessWidget {
-  const _TictaReadinessCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return _SectionCard(
-      title: 'TICTA Readiness',
-      subtitle: 'สรุประบบระดับซอฟต์แวร์จริงที่ ReJoy ใช้โชว์ต่อกรรมการได้ทันที',
-      child: const Column(
-        children: [
-          _ReadinessItem(
-            icon: Icons.shield_rounded,
-            title: 'Red-Flag Safety',
-            detail: 'สแกนคำเสี่ยงก่อนส่ง AI และพาเข้า SOS เมื่อเป็นระดับวิกฤต',
-          ),
-          _ReadinessItem(
-            icon: Icons.verified_user_rounded,
-            title: 'Consent & PDPA Gate',
-            detail: 'แจ้งข้อจำกัดทางการแพทย์และขอ consent ก่อนเริ่มใช้งาน',
-          ),
-          _ReadinessItem(
-            icon: Icons.psychology_alt_rounded,
-            title: 'Explainable Scoring',
-            detail: 'อธิบายคะแนน PHQ-9 และ Matrix แบบเข้าใจง่าย ไม่ทำให้ตกใจ',
-          ),
-          _ReadinessItem(
-            icon: Icons.route_rounded,
-            title: 'Offline SOS',
-            detail: 'คำนวณโรงพยาบาลใกล้สุดด้วย Haversine บนเครื่อง',
-          ),
-          _ReadinessItem(
-            icon: Icons.science_rounded,
-            title: 'Demo Sandbox',
-            detail: 'จำลองเกาะพายุ เควส สัตว์ และ SOS ให้กรรมการเห็นเร็ว',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ReadinessItem extends StatelessWidget {
-  const _ReadinessItem({
-    required this.icon,
-    required this.title,
-    required this.detail,
-  });
-
-  final IconData icon;
-  final String title;
-  final String detail;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEAF6F3),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(icon, color: const Color(0xFF5F9B91), size: 21),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Color(0xFF17343C),
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  detail,
-                  style: const TextStyle(color: Color(0xFF607A81), height: 1.3),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _HeroCard extends StatelessWidget {
   const _HeroCard({
     required this.user,
@@ -705,6 +609,7 @@ class _HeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDemoProfile = user.email.endsWith('@rejoy.demo');
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -763,6 +668,35 @@ class _HeroCard extends StatelessWidget {
             'รวมข้อมูลยา ประวัติแพ้ยา อาการล่าสุด และบันทึกความในใจ เพื่อให้แพทย์ประเมินเร็วขึ้นและลด Recall Bias',
             style: TextStyle(color: Color(0xFF284B52), height: 1.45),
           ),
+          if (isDemoProfile) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(13),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFE7D5).withValues(alpha: 0.92),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFEAA36E)),
+              ),
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_rounded, color: Color(0xFFC4683A), size: 20),
+                  SizedBox(width: 9),
+                  Expanded(
+                    child: Text(
+                      'ข้อมูลนี้เป็นข้อมูลจำลองสำหรับสาธิต: จำลองผู้ใช้ภาวะซึมเศร้าระดับรุนแรง ไม่ใช่ข้อมูลผู้ป่วยจริง',
+                      style: TextStyle(
+                        color: Color(0xFF8A4424),
+                        height: 1.35,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
