@@ -2,12 +2,22 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiConfig {
+  static const _cloudBaseUrl = 'https://rejoy-backend.onrender.com';
   static const _overrideKey = 'rejoy_api_base_url';
   static String? _savedBaseUrl;
 
   static Future<void> initialize() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getString(_overrideKey)?.trim();
+    const envBaseUrl = String.fromEnvironment(
+      'REJOY_API_BASE_URL',
+      defaultValue: '',
+    );
+    if (envBaseUrl.isNotEmpty || _isLocalDevelopmentUrl(saved)) {
+      await prefs.remove(_overrideKey);
+      _savedBaseUrl = null;
+      return;
+    }
     if (saved != null && saved.isNotEmpty) {
       _savedBaseUrl = _normalizeBaseUrl(saved);
     }
@@ -29,10 +39,6 @@ class ApiConfig {
   static String get configuredBaseUrl => _savedBaseUrl ?? baseUrl;
 
   static String get baseUrl {
-    if (_savedBaseUrl != null && _savedBaseUrl!.isNotEmpty) {
-      return _savedBaseUrl!;
-    }
-
     const envBaseUrl = String.fromEnvironment(
       'REJOY_API_BASE_URL',
       defaultValue: '',
@@ -41,8 +47,12 @@ class ApiConfig {
       return _normalizeBaseUrl(envBaseUrl);
     }
 
+    if (_savedBaseUrl != null && _savedBaseUrl!.isNotEmpty) {
+      return _savedBaseUrl!;
+    }
+
     if (kIsWeb) {
-      return 'http://localhost:3000';
+      return _cloudBaseUrl;
     }
 
     switch (defaultTargetPlatform) {
@@ -64,6 +74,13 @@ class ApiConfig {
       url = url.substring(0, url.length - 1);
     }
     return url;
+  }
+
+  static bool _isLocalDevelopmentUrl(String? value) {
+    final url = value?.trim().toLowerCase() ?? '';
+    return url.contains('localhost') ||
+        url.contains('127.0.0.1') ||
+        url.contains('10.0.2.2');
   }
 
   static Uri healthUri() => Uri.parse('$baseUrl/api/health');
