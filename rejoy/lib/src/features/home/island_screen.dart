@@ -629,18 +629,30 @@ class _GloomyCloudCanopy extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final stormAlpha = weather.kind == _WeatherKind.sunny ? 0.22 : 0.82;
+    if (weather.kind == _WeatherKind.sunny) {
+      return const SizedBox.shrink();
+    }
+    final cloudAsset = weather.kind == _WeatherKind.cloudy
+        ? 'assets/images/island_parts/cloud_neutral.png'
+        : 'assets/images/island_parts/cloud_sad.png';
+    final stormAlpha = weather.kind == _WeatherKind.cloudy ? 0.70 : 0.86;
     final drift = math.sin(progress * math.pi * 2) * 14;
     return IgnorePointer(
       child: Opacity(
         opacity: stormAlpha,
         child: Transform.translate(
           offset: Offset(drift, 0),
-          child: Image.asset(
-            'assets/images/island_parts/cloud_gloomy.png',
-            height: 136,
-            fit: BoxFit.cover,
-            filterQuality: FilterQuality.high,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 520),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            child: Image.asset(
+              cloudAsset,
+              key: ValueKey(cloudAsset),
+              height: weather.kind == _WeatherKind.cloudy ? 126 : 138,
+              fit: BoxFit.cover,
+              filterQuality: FilterQuality.high,
+            ),
           ),
         ),
       ),
