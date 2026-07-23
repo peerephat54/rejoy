@@ -10,6 +10,7 @@ const morgan = require('morgan');
 const authRoutes = require('./routes/authRoutes');
 const healthRoutes = require('./routes/healthRoutes');
 const chatRoutes = require('./routes/chatRoutes');
+const clinicalRoutes = require('./routes/clinicalRoutes');
 const questRoutes = require('./routes/questRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const userRoutes = require('./routes/userRoutes');
@@ -73,11 +74,12 @@ app.use(morgan('dev'));
 app.get('/', (req, res) => {
   res.json({
     message: 'ReJoy Backend API',
-    endpoints: ['/api/health', '/api/users', '/api/quests', '/api/reports'],
+    endpoints: ['/api/health', '/api/users', '/api/quests', '/api/reports', '/api/clinical/dashboard'],
   });
 });
 
 app.use('/api/chat', noStore, chatRoutes);
+app.use('/api/clinical', noStore, clinicalRoutes);
 app.use('/api/auth', noStore, authRoutes);
 app.use('/api/health', noStore, healthRoutes);
 app.use('/api/users', noStore, userRoutes);

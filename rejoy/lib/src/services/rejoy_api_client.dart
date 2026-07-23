@@ -685,6 +685,54 @@ class ReJoyApiClient {
     );
   }
 
+  Future<Map<String, dynamic>> fetchClinicalDashboard() async {
+    final response = await _http
+        .get(
+          ApiConfig.clinicalDashboardUri(),
+          headers: {'accept': 'application/json'},
+        )
+        .timeout(const Duration(seconds: 8));
+
+    return _decodeJsonObject(
+      response,
+      (json) => json,
+      'Clinical dashboard request failed',
+    );
+  }
+
+  Future<Map<String, dynamic>> createCarePlan({
+    required String title,
+    required String focusArea,
+    required String recommendedQuestEnergy,
+    String? userId,
+    String? note,
+  }) async {
+    final response = await _http
+        .post(
+          ApiConfig.clinicalCarePlansUri(),
+          headers: {
+            'accept': 'application/json',
+            'content-type': 'application/json',
+          },
+          body: jsonEncode({
+            'title': title,
+            'focusArea': focusArea,
+            'recommendedQuestEnergy': recommendedQuestEnergy,
+            if (userId != null && userId.isNotEmpty) 'userId': userId,
+            if (note != null && note.isNotEmpty) 'note': note,
+          }),
+        )
+        .timeout(const Duration(seconds: 8));
+
+    final result = await _decodeJsonObject(
+      response,
+      (json) => json,
+      'Create care plan failed',
+    );
+    _invalidateUserCaches();
+    return result;
+  }
+
   Future<List<BackendUser>> fetchUsers() async {
     final response = await _http
         .get(ApiConfig.usersUri(), headers: {'accept': 'application/json'})

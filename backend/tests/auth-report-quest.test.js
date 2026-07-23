@@ -203,3 +203,83 @@ test("deep health is hidden in production without health key", async () => {
     process.env.HEALTH_CHECK_KEY = originalHealthKey;
   }
 });
+
+test("clinical dashboard summarizes own patient risk without diary text", async () => {
+  const auth = await register("clinical-owner@example.com");
+
+  await request(app)
+    .post("/api/reports")
+    .set("Authorization", `Bearer ${auth.token}`)
+    .send({
+      dailyMood: "heavy",
+      diaryNote: "This private text should not appear in dashboard",
+      phq9Score: 22,
+      cbtCompletionRate: "1/5",
+      isSosTriggered: true,
+      symptomMatrix: {
+        mood_score: 8,
+        somatic_score: 6,
+        behavioral_score: 7,
+      },
+    })
+    .expect(201);
+
+  const dashboard = await request(app)
+    .get("/api/clinical/dashboard")
+    .set("Authorization", `Bearer ${auth.token}`)
+    .expect(200);
+
+  assert.equal(dashboard.body.scope, "self-demo");
+  assert.equal(dashboard.body.totals.patients, 1);
+  assert.equal(dashboard.body.patients[0].riskStatus, "Urgent");
+  assert.equal(dashboard.body.privacy.diaryTextHidden, true);
+  assert.equal(JSON.stringify(dashboard.body).includes("private text"), false);
+});
+
+test("clinical alert queue and care plans are scoped safely", async () => {
+  const userA = await register("care-owner@example.com");
+  const userB = await register("care-other@example.com");
+
+  await request(app)
+    .post(`/api/users/${userA.user._id}/phq9-history`)
+    .set("Authorization", `Bearer ${userA.token}`)
+    .send({ total_score: 21 })
+    .expect(201);
+
+  const alerts = await request(app)
+    .get("/api/clinical/alerts")
+    .set("Authorization", `Bearer ${userA.token}`)
+    .expect(200);
+
+  assert.ok(alerts.body.alerts.some((alert) => alert.type === "PHQ9_HIGH"));
+
+  await request(app)
+    .post("/api/clinical/care-plans")
+    .set("Authorization", `Bearer ${userB.token}`)
+    .send({
+      userId: userA.user._id,
+      title: "Try low energy routine",
+      focusArea: "activity",
+    })
+    .expect(403);
+
+  const created = await request(app)
+    .post("/api/clinical/care-plans")
+    .set("Authorization", `Bearer ${userA.token}`)
+    .send({
+      title: "Try low energy routine",
+      focusArea: "activity",
+      recommendedQuestEnergy: "low",
+      note: "Start with one gentle quest.",
+    })
+    .expect(201);
+
+  assert.equal(created.body.carePlan.title, "Try low energy routine");
+
+  const plans = await request(app)
+    .get("/api/clinical/care-plans")
+    .set("Authorization", `Bearer ${userA.token}`)
+    .expect(200);
+
+  assert.equal(plans.body.carePlans.length, 1);
+});

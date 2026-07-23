@@ -90,6 +90,10 @@ class ApiConfig {
   static Uri questsUri() => Uri.parse('$baseUrl/api/quests');
   static Uri reportsUri() => Uri.parse('$baseUrl/api/reports');
   static Uri companionChatUri() => Uri.parse('$baseUrl/api/chat/companion');
+  static Uri clinicalDashboardUri() =>
+      Uri.parse('$baseUrl/api/clinical/dashboard');
+  static Uri clinicalCarePlansUri() =>
+      Uri.parse('$baseUrl/api/clinical/care-plans');
   static Uri authRegisterUri() => Uri.parse('$baseUrl/api/auth/register');
   static Uri authLoginUri() => Uri.parse('$baseUrl/api/auth/login');
   static Uri authRefreshUri() => Uri.parse('$baseUrl/api/auth/refresh');

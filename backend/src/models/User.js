@@ -76,6 +76,31 @@ const positiveMemorySchema = new Schema(
   { _id: false },
 );
 
+const carePlanSchema = new Schema(
+  {
+    title: { type: String, required: true, trim: true },
+    focusArea: {
+      type: String,
+      enum: ["sleep", "activity", "grounding", "medication", "follow_up", "general"],
+      default: "general",
+    },
+    note: { type: String, default: "", trim: true },
+    recommendedQuestEnergy: {
+      type: String,
+      enum: ["low", "medium", "high", "rest"],
+      default: "low",
+    },
+    assignedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    status: {
+      type: String,
+      enum: ["active", "completed", "paused"],
+      default: "active",
+    },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { _id: true },
+);
+
 const refreshTokenSchema = new Schema(
   {
     tokenHash: { type: String, required: true },
@@ -132,6 +157,13 @@ const userSchema = new Schema(
       enum: ["google", "guest", "email"],
       default: "guest",
     },
+    role: {
+      type: String,
+      enum: ["patient", "doctor", "psychologist", "admin"],
+      default: "patient",
+    },
+    assignedClinicianIds: [{ type: Schema.Types.ObjectId, ref: "User" }],
+    carePlans: [carePlanSchema],
     onboardingComplete: { type: Boolean, default: false },
     privacyConsentAcceptedAt: { type: Date, default: null },
     refreshTokens: [refreshTokenSchema],
