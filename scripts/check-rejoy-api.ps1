@@ -1,6 +1,7 @@
 param(
   [switch]$FullSmoke,
-  [string]$HealthCheckKey = $env:REJOY_HEALTH_CHECK_KEY
+  [string]$HealthCheckKey = $env:REJOY_HEALTH_CHECK_KEY,
+  [int]$TimeoutSec = 60
 )
 
 $ErrorActionPreference = "Stop"
@@ -26,7 +27,7 @@ function Invoke-ReJoyCheck {
   $uri = "$BaseUrl$Path"
   $started = Get-Date
   try {
-    $response = Invoke-RestMethod -Uri $uri -Method Get -Headers $Headers -TimeoutSec 10
+    $response = Invoke-RestMethod -Uri $uri -Method Get -Headers $Headers -TimeoutSec $TimeoutSec
     $elapsed = [int]((Get-Date) - $started).TotalMilliseconds
     Write-Host "[OK] $Name ($elapsed ms)" -ForegroundColor Green
     return $response
@@ -61,11 +62,11 @@ if ($FullSmoke) {
     age = 18
   } | ConvertTo-Json
 
-  $auth = Invoke-RestMethod -Uri "$BaseUrl/api/auth/register" -Method Post -ContentType "application/json" -Body $authBody -TimeoutSec 10
+  $auth = Invoke-RestMethod -Uri "$BaseUrl/api/auth/register" -Method Post -ContentType "application/json" -Body $authBody -TimeoutSec $TimeoutSec
   $headers = @{ Authorization = "Bearer $($auth.token)" }
   Write-Host "[OK] Auth register smoke user" -ForegroundColor Green
 
-  $profile = Invoke-RestMethod -Uri "$BaseUrl/api/users/active/profile" -Headers $headers -Method Get -TimeoutSec 10
+  $profile = Invoke-RestMethod -Uri "$BaseUrl/api/users/active/profile" -Headers $headers -Method Get -TimeoutSec $TimeoutSec
   Write-Host "[OK] Active clinical profile for $($profile.user.email)" -ForegroundColor Green
 
   $reportBody = @{
@@ -79,7 +80,7 @@ if ($FullSmoke) {
       behavioral_score = 1
     }
   } | ConvertTo-Json -Depth 4
-  $report = Invoke-RestMethod -Uri "$BaseUrl/api/reports" -Headers $headers -Method Post -ContentType "application/json" -Body $reportBody -TimeoutSec 10
+  $report = Invoke-RestMethod -Uri "$BaseUrl/api/reports" -Headers $headers -Method Post -ContentType "application/json" -Body $reportBody -TimeoutSec $TimeoutSec
   Write-Host "[OK] Report create smoke id=$($report._id)" -ForegroundColor Green
 }
 

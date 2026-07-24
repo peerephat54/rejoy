@@ -332,7 +332,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     exportingPdf: _exportingPdf,
                   ),
                   const SizedBox(height: 14),
-                  _HospitalDemoCard(user: data.user),
+                  if (data.user.isClinician) _HospitalDemoCard(user: data.user),
                   if (_statusMessage != null) ...[
                     const SizedBox(height: 12),
                     _StatusCard(title: 'สถานะ', subtitle: _statusMessage!),
@@ -608,6 +608,7 @@ class _HospitalDemoCard extends StatefulWidget {
 class _HospitalDemoCardState extends State<_HospitalDemoCard> {
   final ReJoyApiClient _client = ReJoyApiClient();
   late Future<Map<String, dynamic>> _dashboardFuture;
+  bool _dashboardOpen = false;
   bool _assigning = false;
   String? _message;
 
@@ -648,14 +649,14 @@ class _HospitalDemoCardState extends State<_HospitalDemoCard> {
       if (!mounted) return;
       setState(() {
         _assigning = false;
-        _message = 'Care plan demo ถูกเพิ่มแล้ว';
+        _message = 'Demo care plan assigned.';
         _dashboardFuture = _client.fetchClinicalDashboard();
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _assigning = false;
-        _message = 'เพิ่ม care plan ไม่สำเร็จ: $error';
+        _message = 'Care plan failed: $error';
       });
     }
   }
@@ -663,123 +664,229 @@ class _HospitalDemoCardState extends State<_HospitalDemoCard> {
   @override
   Widget build(BuildContext context) {
     return _SectionCard(
-      title: 'Hospital Demo View',
+      title: _dashboardOpen ? 'Care Team Dashboard' : 'Hospital Dashboard',
       subtitle:
-          'มุมมองจำลองสำหรับโรงพยาบาล: สรุปความเสี่ยง, alert queue และ care plan โดยไม่เปิด diary ดิบ',
-      child: FutureBuilder<Map<String, dynamic>>(
-        future: _dashboardFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const _EmptyState(text: 'กำลังโหลด Hospital Dashboard...');
-          }
-          if (snapshot.hasError) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _EmptyState(
-                  text: 'ยังโหลด dashboard ไม่ได้: ${snapshot.error}',
-                ),
-                const SizedBox(height: 10),
-                FilledButton.tonalIcon(
-                  onPressed: _refresh,
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: const Text('ลองโหลดใหม่'),
-                ),
-              ],
-            );
-          }
+          'Tap to open a hospital-style patient list, risk triage, alert queue, and care plan demo without exposing raw diary text.',
+      child: _dashboardOpen
+          ? FutureBuilder<Map<String, dynamic>>(
+              future: _dashboardFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const _EmptyState(
+                    text: 'Loading Hospital Dashboard...',
+                  );
+                }
+                if (snapshot.hasError) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _EmptyState(
+                        text: 'Dashboard failed to load: ${snapshot.error}',
+                      ),
+                      const SizedBox(height: 10),
+                      FilledButton.tonalIcon(
+                        onPressed: _refresh,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Retry'),
+                      ),
+                    ],
+                  );
+                }
 
-          final data = snapshot.data ?? {};
-          final totals = data['totals'] is Map
-              ? Map<String, dynamic>.from(data['totals'] as Map)
-              : <String, dynamic>{};
-          final alerts = data['alerts'] is List
-              ? List<dynamic>.from(data['alerts'] as List)
-              : <dynamic>[];
-          final patients = data['patients'] is List
-              ? List<dynamic>.from(data['patients'] as List)
-              : <dynamic>[];
+                final data = snapshot.data ?? {};
+                final totals = data['totals'] is Map
+                    ? Map<String, dynamic>.from(data['totals'] as Map)
+                    : <String, dynamic>{};
+                final alerts = data['alerts'] is List
+                    ? List<dynamic>.from(data['alerts'] as List)
+                    : <dynamic>[];
+                final patients = data['patients'] is List
+                    ? List<dynamic>.from(data['patients'] as List)
+                    : <dynamic>[];
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  _HospitalMetric(
-                    label: 'Stable',
-                    value: '${totals['stable'] ?? 0}',
-                    color: const Color(0xFF72B8AD),
-                  ),
-                  _HospitalMetric(
-                    label: 'Watch',
-                    value: '${totals['watch'] ?? 0}',
-                    color: const Color(0xFFE2AE43),
-                  ),
-                  _HospitalMetric(
-                    label: 'Urgent',
-                    value: '${totals['urgent'] ?? 0}',
-                    color: const Color(0xFFDB6B5D),
-                  ),
-                  _HospitalMetric(
-                    label: 'Alerts',
-                    value: '${totals['alerts'] ?? 0}',
-                    color: const Color(0xFF5D6C89),
-                  ),
-                ],
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        _HospitalMetric(
+                          label: 'Stable',
+                          value: '${totals['stable'] ?? 0}',
+                          color: const Color(0xFF72B8AD),
+                        ),
+                        _HospitalMetric(
+                          label: 'Watch',
+                          value: '${totals['watch'] ?? 0}',
+                          color: const Color(0xFFE2AE43),
+                        ),
+                        _HospitalMetric(
+                          label: 'Urgent',
+                          value: '${totals['urgent'] ?? 0}',
+                          color: const Color(0xFFDB6B5D),
+                        ),
+                        _HospitalMetric(
+                          label: 'Alerts',
+                          value: '${totals['alerts'] ?? 0}',
+                          color: const Color(0xFF5D6C89),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      'Patients under your care',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: const Color(0xFF17343C),
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (patients.isEmpty)
+                      const _EmptyState(text: 'No assigned patients yet')
+                    else
+                      ...patients
+                          .take(6)
+                          .map(
+                            (patient) => Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: _HospitalPatientRow(
+                                patient: Map<String, dynamic>.from(
+                                  patient as Map,
+                                ),
+                              ),
+                            ),
+                          ),
+                    const SizedBox(height: 12),
+                    Text(
+                      alerts.isEmpty
+                          ? 'Alert queue: No urgent cases right now'
+                          : 'Alert queue: ${(alerts.first as Map)['title'] ?? 'Needs review'}',
+                      style: const TextStyle(
+                        color: Color(0xFF17343C),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: _assigning ? null : _assignDemoCarePlan,
+                            icon: _assigning
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.assignment_turned_in_rounded,
+                                  ),
+                            label: const Text('Assign demo care plan'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton.filledTonal(
+                          onPressed: _refresh,
+                          icon: const Icon(Icons.refresh_rounded),
+                        ),
+                      ],
+                    ),
+                    if (_message != null) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        _message!,
+                        style: const TextStyle(
+                          color: Color(0xFF31525A),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ],
+                );
+              },
+            )
+          : _HospitalDashboardEntry(
+              onOpen: () => setState(() => _dashboardOpen = true),
+            ),
+    );
+  }
+}
+
+class _HospitalDashboardEntry extends StatelessWidget {
+  const _HospitalDashboardEntry({required this.onOpen});
+
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(24),
+      onTap: onOpen,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFEFF9F6), Color(0xFFFFF3D8)],
+          ),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFD1E4DF)),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF31525A).withValues(alpha: 0.08),
+              blurRadius: 18,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 54,
+              height: 54,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFF72B8AD),
               ),
-              const SizedBox(height: 12),
-              if (patients.isNotEmpty)
-                _HospitalPatientRow(
-                  patient: Map<String, dynamic>.from(patients.first as Map),
-                ),
-              const SizedBox(height: 12),
-              Text(
-                alerts.isEmpty
-                    ? 'Alert queue: ตอนนี้ไม่มีเคสเร่งด่วน'
-                    : 'Alert queue: ${(alerts.first as Map)['title'] ?? 'Needs review'}',
-                style: const TextStyle(
-                  color: Color(0xFF17343C),
-                  fontWeight: FontWeight.w800,
-                ),
+              child: const Icon(
+                Icons.monitor_heart_rounded,
+                color: Colors.white,
+                size: 30,
               ),
-              const SizedBox(height: 12),
-              Row(
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: _assigning ? null : _assignDemoCarePlan,
-                      icon: _assigning
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.assignment_turned_in_rounded),
-                      label: const Text('Assign demo care plan'),
+                  Text(
+                    'Open Patient Dashboard',
+                    style: TextStyle(
+                      color: Color(0xFF17343C),
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  IconButton.filledTonal(
-                    onPressed: _refresh,
-                    icon: const Icon(Icons.refresh_rounded),
+                  SizedBox(height: 4),
+                  Text(
+                    'View assigned patients, risk status, alert queue, and care plan actions.',
+                    style: TextStyle(color: Color(0xFF607A81), height: 1.35),
                   ),
                 ],
               ),
-              if (_message != null) ...[
-                const SizedBox(height: 10),
-                Text(
-                  _message!,
-                  style: const TextStyle(
-                    color: Color(0xFF31525A),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ],
-          );
-        },
+            ),
+            const Icon(
+              Icons.arrow_forward_ios_rounded,
+              color: Color(0xFF31525A),
+              size: 18,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -834,6 +941,9 @@ class _HospitalPatientRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final risk = patient['riskStatus']?.toString() ?? 'Stable';
+    final code = patient['patientCode']?.toString() ?? 'RJ-DEMO';
+    final rawName = patient['displayName']?.toString().trim() ?? '';
+    final displayName = rawName.isEmpty ? 'Patient $code' : rawName;
     final riskColor = switch (risk) {
       'Urgent' => const Color(0xFFDB6B5D),
       'Watch' => const Color(0xFFE2AE43),
@@ -860,19 +970,20 @@ class _HospitalPatientRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${patient['patientCode'] ?? 'RJ-DEMO'} • $risk',
+                  '$displayName • $risk',
                   style: const TextStyle(
                     color: Color(0xFF17343C),
                     fontWeight: FontWeight.w900,
                   ),
                 ),
                 Text(
-                  'PHQ-9 ${patient['latestPhq9'] ?? 0} • CBT ${patient['cbtCompletionAverage'] ?? 0}%',
+                  '$code • PHQ-9 ${patient['latestPhq9'] ?? 0} • CBT ${patient['cbtCompletionAverage'] ?? 0}%',
                   style: const TextStyle(color: Color(0xFF607A81)),
                 ),
               ],
             ),
           ),
+          const Icon(Icons.chevron_right_rounded, color: Color(0xFF607A81)),
         ],
       ),
     );

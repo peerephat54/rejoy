@@ -6,6 +6,7 @@ import 'core/rejoy_session.dart';
 import 'core/rejoy_theme.dart';
 import 'features/auth/auth_screen.dart';
 import 'features/chat/chat_screen.dart';
+import 'features/doctor/doctor_dashboard_screen.dart';
 import 'features/home/island_screen.dart';
 import 'features/missions/missions_screen.dart';
 import 'features/onboarding/conversational_onboarding_screen.dart';
@@ -44,6 +45,7 @@ class _ReJoyAuthGateState extends State<ReJoyAuthGate>
   bool _signedIn = AuthSession.isSignedIn;
   bool? _consentAccepted;
   bool _onboardingFinishedThisSession = false;
+  bool _roleSelectedThisSession = false;
   bool _openSosAfterOnboarding = false;
   Future<ClinicalProfilePayload>? _profileFuture;
 
@@ -87,8 +89,44 @@ class _ReJoyAuthGateState extends State<ReJoyAuthGate>
     setState(() {
       _signedIn = false;
       _onboardingFinishedThisSession = false;
+      _roleSelectedThisSession = false;
       _openSosAfterOnboarding = false;
       _profileFuture = null;
+    });
+  }
+
+  void _handleSignedOut() {
+    setState(() {
+      _signedIn = false;
+      _onboardingFinishedThisSession = false;
+      _roleSelectedThisSession = false;
+      _openSosAfterOnboarding = false;
+      _profileFuture = null;
+    });
+  }
+
+  Future<void> _selectRole(BackendUser user, String role) async {
+    if (role == 'patient') {
+      setState(() => _roleSelectedThisSession = true);
+      return;
+    }
+
+    await _client.updateUserProfile(
+      userId: user.id,
+      firstName: user.firstName,
+      surname: user.surname,
+      age: user.age,
+      allergies: user.allergies,
+      emergencyContactNumbers: user.emergencyContactNumbers,
+      currentMedications: user.currentMedications,
+      medicalHistory: user.medicalHistory,
+      onboardingComplete: true,
+      role: 'doctor',
+    );
+    if (!mounted) return;
+    setState(() {
+      _roleSelectedThisSession = true;
+      _profileFuture = _client.fetchActiveClinicalProfile(forceRefresh: true);
     });
   }
 
@@ -109,6 +147,7 @@ class _ReJoyAuthGateState extends State<ReJoyAuthGate>
             _signedIn = true;
             _consentAccepted = accepted;
             _onboardingFinishedThisSession = false;
+            _roleSelectedThisSession = false;
             _openSosAfterOnboarding = false;
             _profileFuture = _client.fetchActiveClinicalProfile(
               forceRefresh: true,
@@ -165,6 +204,17 @@ class _ReJoyAuthGateState extends State<ReJoyAuthGate>
           }
 
           final user = snapshot.data!.user;
+          if (user.isClinician) {
+            return DoctorDashboardScreen(onSignedOut: _handleSignedOut);
+          }
+
+          if (!user.onboardingComplete && !_roleSelectedThisSession) {
+            return _RoleSelectionScreen(
+              user: user,
+              onRoleSelected: (role) => _selectRole(user, role),
+            );
+          }
+
           if (!user.onboardingComplete) {
             return ConversationalOnboardingScreen(
               user: user,
@@ -186,12 +236,7 @@ class _ReJoyAuthGateState extends State<ReJoyAuthGate>
 
           return ReJoyShell(
             initialIndex: _openSosAfterOnboarding ? 4 : 0,
-            onSignedOut: () => setState(() {
-              _signedIn = false;
-              _onboardingFinishedThisSession = false;
-              _openSosAfterOnboarding = false;
-              _profileFuture = null;
-            }),
+            onSignedOut: _handleSignedOut,
           );
         },
       );
@@ -199,12 +244,201 @@ class _ReJoyAuthGateState extends State<ReJoyAuthGate>
 
     return ReJoyShell(
       initialIndex: _openSosAfterOnboarding ? 4 : 0,
-      onSignedOut: () => setState(() {
-        _signedIn = false;
-        _onboardingFinishedThisSession = false;
-        _openSosAfterOnboarding = false;
-        _profileFuture = null;
-      }),
+      onSignedOut: _handleSignedOut,
+    );
+  }
+}
+
+class _RoleSelectionScreen extends StatefulWidget {
+  const _RoleSelectionScreen({
+    required this.user,
+    required this.onRoleSelected,
+  });
+
+  final BackendUser user;
+  final Future<void> Function(String role) onRoleSelected;
+
+  @override
+  State<_RoleSelectionScreen> createState() => _RoleSelectionScreenState();
+}
+
+class _RoleSelectionScreenState extends State<_RoleSelectionScreen> {
+  bool _saving = false;
+  String? _error;
+
+  Future<void> _choose(String role) async {
+    if (_saving) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await widget.onRoleSelected(role);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = error.toString();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFE8F6F4), Color(0xFFFFF4DA)],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(22),
+              child: Container(
+                padding: const EdgeInsets.all(22),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.84),
+                  borderRadius: BorderRadius.circular(32),
+                  border: Border.all(color: const Color(0xFFCDE2DE)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF31525A).withValues(alpha: 0.08),
+                      blurRadius: 24,
+                      offset: const Offset(0, 14),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Choose Your ReJoy Role',
+                      style: TextStyle(
+                        color: Color(0xFF17343C),
+                        fontSize: 28,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      widget.user.email,
+                      style: const TextStyle(color: Color(0xFF607A81)),
+                    ),
+                    const SizedBox(height: 18),
+                    _RoleCard(
+                      icon: Icons.favorite_rounded,
+                      title: 'Patient',
+                      subtitle:
+                          'Use ReJoy as a gentle companion, answer onboarding questions, do Micro-CBT quests, and export a doctor report.',
+                      enabled: !_saving,
+                      onTap: () => _choose('patient'),
+                    ),
+                    const SizedBox(height: 12),
+                    _RoleCard(
+                      icon: Icons.health_and_safety_rounded,
+                      title: 'Doctor / Care Team',
+                      subtitle:
+                          'Open a clinical dashboard for assigned patients, alert queues, and supportive care-plan follow-up without raw diary text.',
+                      enabled: !_saving,
+                      onTap: () => _choose('doctor'),
+                    ),
+                    if (_saving) ...[
+                      const SizedBox(height: 16),
+                      const LinearProgressIndicator(),
+                    ],
+                    if (_error != null) ...[
+                      const SizedBox(height: 14),
+                      Text(
+                        _error!,
+                        style: const TextStyle(
+                          color: Color(0xFFB6534B),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RoleCard extends StatelessWidget {
+  const _RoleCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: enabled ? onTap : null,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEAF4F1),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFCDE2DE)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: const Color(0xFF72B8AD),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Icon(icon, color: Colors.white),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Color(0xFF17343C),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: Color(0xFF607A81),
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFF607A81)),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -593,7 +827,11 @@ class _ReJoyShellState extends State<ReJoyShell> {
             onSafetyEscalation: _handleSafetyEscalation,
           );
         case 2:
-          return MissionsScreen(session: session, onEnergySelected: _setEnergy);
+          return MissionsScreen(
+            session: session,
+            onEnergySelected: _setEnergy,
+            onGoToIsland: () => setState(() => selectedIndex = 0),
+          );
         case 3:
           return ProfileScreen(
             session: session,

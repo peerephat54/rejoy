@@ -25,6 +25,31 @@ function isClinician(user) {
   return ["doctor", "psychologist", "admin"].includes(user?.role);
 }
 
+function isAdmin(user) {
+  return user?.role === "admin";
+}
+
+function idEquals(left, right) {
+  return left?.toString() === right?.toString();
+}
+
+function isAssignedClinician(patient, clinician) {
+  return (patient.assignedClinicianIds || []).some((clinicianId) =>
+    idEquals(clinicianId, clinician?._id),
+  );
+}
+
+function canAccessCareSubject(requester, targetUser) {
+  if (!requester || !targetUser) return false;
+  if (idEquals(requester._id, targetUser._id)) return true;
+  if (isAdmin(requester)) return true;
+  return (
+    isClinician(requester) &&
+    targetUser.role === "patient" &&
+    isAssignedClinician(targetUser, requester)
+  );
+}
+
 function lastItem(items) {
   if (!Array.isArray(items) || items.length === 0) return null;
   return items[items.length - 1];
@@ -56,6 +81,11 @@ function initials(user) {
   return `${user.firstName?.[0] ?? "P"}${user.surname?.[0] ?? ""}`.toUpperCase();
 }
 
+function displayName(user) {
+  const fullName = [user.firstName, user.surname].filter(Boolean).join(" ").trim();
+  return fullName || patientCode(user);
+}
+
 function average(items) {
   if (!items.length) return 0;
   return items.reduce((sum, value) => sum + value, 0) / items.length;
@@ -81,6 +111,7 @@ function summarizePatient(user, reportsForUser) {
   return {
     userId: user._id,
     patientCode: patientCode(user),
+    displayName: displayName(user),
     initials: initials(user),
     age: user.age,
     riskStatus,
@@ -153,8 +184,19 @@ function buildAlerts(patientSummary, user) {
 }
 
 async function scopedUsers(req) {
+  if (isAdmin(req.user)) {
+    return User.find({ role: "patient" })
+      .select(CLINICAL_USER_FIELDS)
+      .sort({ updatedAt: -1 })
+      .limit(100)
+      .lean();
+  }
+
   if (isClinician(req.user)) {
-    return User.find({})
+    return User.find({
+      role: "patient",
+      assignedClinicianIds: req.user._id,
+    })
       .select(CLINICAL_USER_FIELDS)
       .sort({ updatedAt: -1 })
       .limit(100)
@@ -237,12 +279,15 @@ async function getClinicalAlerts(req, res, next) {
 async function listCarePlans(req, res, next) {
   try {
     const targetUserId = req.params.userId || req.user._id;
-    if (!isClinician(req.user) && targetUserId.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "You can only access your own care plans" });
-    }
-
-    const user = await User.findById(targetUserId).select("carePlans").lean();
+    const user = await User.findById(targetUserId)
+      .select("role assignedClinicianIds carePlans")
+      .lean();
     if (!user) return res.status(404).json({ message: "User not found" });
+    if (!canAccessCareSubject(req.user, user)) {
+      return res
+        .status(403)
+        .json({ message: "You can only access assigned care plans" });
+    }
     return res.json({ carePlans: user.carePlans || [] });
   } catch (error) {
     return next(error);
@@ -252,9 +297,6 @@ async function listCarePlans(req, res, next) {
 async function createCarePlan(req, res, next) {
   try {
     const targetUserId = req.body.userId || req.user._id;
-    if (!isClinician(req.user) && targetUserId.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "Only clinicians can assign care plans to other users" });
-    }
 
     const title = String(req.body.title || "").trim();
     if (!title) {
@@ -271,8 +313,15 @@ async function createCarePlan(req, res, next) {
       createdAt: new Date(),
     };
 
-    const user = await User.findById(targetUserId);
+    const user = await User.findById(targetUserId).select(
+      "role assignedClinicianIds carePlans",
+    );
     if (!user) return res.status(404).json({ message: "User not found" });
+    if (!canAccessCareSubject(req.user, user)) {
+      return res
+        .status(403)
+        .json({ message: "Only assigned clinicians can assign this care plan" });
+    }
 
     user.carePlans.push(carePlan);
     await user.save();

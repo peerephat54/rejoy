@@ -6,6 +6,7 @@ const USER_SUMMARY_FIELDS = [
   "surname",
   "email",
   "age",
+  "role",
   "allergies",
   "medicalHistory",
   "emergencyContactNumbers",
@@ -30,6 +31,31 @@ const USER_SUMMARY_FIELDS = [
   "createdAt",
   "updatedAt",
 ].join(" ");
+
+const UPDATABLE_USER_FIELDS = new Set([
+  "firstName",
+  "surname",
+  "age",
+  "allergies",
+  "medicalHistory",
+  "emergencyContactNumbers",
+  "currentMedications",
+  "symptomClusteringMatrix",
+  "behavioralActivationTracking",
+  "currentEnergyLevel",
+  "dailyMoodCheckin",
+  "selectedQuestsToday",
+  "completedQuestsToday",
+  "unlockedAnimals",
+  "animalNicknames",
+  "positiveMemoryBank",
+  "companionMirrorState",
+  "currentIslandWeather",
+  "onboardingComplete",
+  "role",
+]);
+
+const SELF_SELECTABLE_ROLES = new Set(["patient", "doctor"]);
 
 const DEFAULT_ANIMAL_POOL = [
   { id: "fox-01", family: "fox", name: "จิ้งจอกแสงอุ่น" },
@@ -86,6 +112,30 @@ function normalizeBoolean(value, fallback = false) {
     if (["false", "0", "no", "n"].includes(normalized)) return false;
   }
   return Boolean(value);
+}
+
+function pickSafeUserUpdates(body) {
+  const updates = {};
+  Object.entries(body || {}).forEach(([key, value]) => {
+    if (UPDATABLE_USER_FIELDS.has(key)) {
+      updates[key] = value;
+    }
+  });
+
+  if (updates.role !== undefined) {
+    const role = normalizeString(updates.role).toLowerCase();
+    if (!SELF_SELECTABLE_ROLES.has(role)) {
+      const error = new Error("Role must be patient or doctor");
+      error.statusCode = 400;
+      throw error;
+    }
+    updates.role = role;
+    if (role === "doctor") {
+      updates.onboardingComplete = true;
+    }
+  }
+
+  return updates;
 }
 
 function animalFamily(animalId = "") {
@@ -223,9 +273,7 @@ async function getUserById(req, res, next) {
 
 async function updateUser(req, res, next) {
   try {
-    const updates = {
-      ...req.body,
-    };
+    const updates = pickSafeUserUpdates(req.body);
 
     if (req.body.allergies !== undefined) {
       updates.allergies = normalizeArray(req.body.allergies);

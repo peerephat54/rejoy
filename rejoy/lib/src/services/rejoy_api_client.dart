@@ -40,6 +40,7 @@ class BackendUser {
   const BackendUser({
     required this.id,
     required this.email,
+    required this.role,
     required this.firstName,
     required this.surname,
     required this.age,
@@ -59,6 +60,7 @@ class BackendUser {
 
   final String id;
   final String email;
+  final String role;
   final String firstName;
   final String surname;
   final int age;
@@ -76,6 +78,9 @@ class BackendUser {
   final bool onboardingComplete;
 
   String get fullName => '$firstName $surname'.trim();
+  bool get isClinician =>
+      role == 'doctor' || role == 'psychologist' || role == 'admin';
+
   int get questsUntilNextAnimal {
     final remainder = completedQuestsCount % 3;
     return remainder == 0 ? 3 : 3 - remainder;
@@ -93,6 +98,7 @@ class BackendUser {
     return BackendUser(
       id: json['_id']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
+      role: json['role']?.toString() ?? 'patient',
       firstName: json['firstName']?.toString() ?? '',
       surname: json['surname']?.toString() ?? '',
       age: int.tryParse(json['age']?.toString() ?? '') ?? 0,
@@ -604,6 +610,7 @@ class ReJoyApiClient {
     required String firstName,
     required String surname,
     required int age,
+    String role = 'patient',
   }) async {
     final response = await _http
         .post(
@@ -618,6 +625,7 @@ class ReJoyApiClient {
             'firstName': firstName,
             'surname': surname,
             'age': age,
+            'role': role,
           }),
         )
         .timeout(const Duration(seconds: 45));
@@ -693,6 +701,13 @@ class ReJoyApiClient {
         )
         .timeout(const Duration(seconds: 8));
 
+    if (response.statusCode == 404) {
+      return _demoClinicalDashboard(
+        note:
+            'Cloud backend route is not deployed yet, so ReJoy is showing a local hospital demo dataset.',
+      );
+    }
+
     return _decodeJsonObject(
       response,
       (json) => json,
@@ -755,6 +770,7 @@ class ReJoyApiClient {
     required List<String> currentMedications,
     required String medicalHistory,
     bool? onboardingComplete,
+    String? role,
   }) async {
     final response = await _http
         .patch(
@@ -771,6 +787,7 @@ class ReJoyApiClient {
             'emergencyContactNumbers': emergencyContactNumbers,
             'currentMedications': currentMedications,
             'medicalHistory': medicalHistory,
+            if (role != null && role.isNotEmpty) 'role': role,
             if (onboardingComplete != null)
               'onboardingComplete': onboardingComplete,
           }),
@@ -1273,4 +1290,107 @@ class ReJoyApiClient {
   void dispose() {
     _http.close();
   }
+}
+
+Map<String, dynamic> _demoClinicalDashboard({String? note}) {
+  final now = DateTime.now().toIso8601String();
+  return {
+    'generatedAt': now,
+    'scope': 'demo-fallback',
+    'totals': {
+      'patients': 3,
+      'stable': 1,
+      'watch': 1,
+      'urgent': 1,
+      'alerts': 4,
+    },
+    'patients': [
+      {
+        'userId': 'demo-heavy',
+        'patientCode': 'RJ-DEMO1',
+        'displayName': 'Demo Patient 1',
+        'initials': 'D1',
+        'age': 16,
+        'riskStatus': 'Urgent',
+        'latestPhq9': 22,
+        'latestMood': 'หม่นมาก',
+        'averagePhq9': 20.8,
+        'cbtCompletionAverage': 28,
+        'sosFlags14d': 1,
+        'activeCarePlanCount': 1,
+        'lastReportAt': now,
+      },
+      {
+        'userId': 'demo-watch',
+        'patientCode': 'RJ-DEMO2',
+        'displayName': 'Demo Patient 2',
+        'initials': 'D2',
+        'age': 17,
+        'riskStatus': 'Watch',
+        'latestPhq9': 15,
+        'latestMood': 'เหนื่อย',
+        'averagePhq9': 14.4,
+        'cbtCompletionAverage': 46,
+        'sosFlags14d': 0,
+        'activeCarePlanCount': 1,
+        'lastReportAt': now,
+      },
+      {
+        'userId': 'demo-stable',
+        'patientCode': 'RJ-DEMO3',
+        'displayName': 'Demo Patient 3',
+        'initials': 'D3',
+        'age': 16,
+        'riskStatus': 'Stable',
+        'latestPhq9': 7,
+        'latestMood': 'พอไหว',
+        'averagePhq9': 6.9,
+        'cbtCompletionAverage': 82,
+        'sosFlags14d': 0,
+        'activeCarePlanCount': 0,
+        'lastReportAt': now,
+      },
+    ],
+    'alerts': [
+      {
+        'severity': 'red',
+        'type': 'PHQ9_HIGH',
+        'patientCode': 'RJ-DEMO1',
+        'title': 'PHQ-9 severe range',
+        'message': 'Latest PHQ-9 = 22. Prioritize clinician review.',
+        'createdAt': now,
+      },
+      {
+        'severity': 'red',
+        'type': 'SOS_TRIGGERED',
+        'patientCode': 'RJ-DEMO1',
+        'title': 'SOS used recently',
+        'message': 'Review safety plan and support contact.',
+        'createdAt': now,
+      },
+      {
+        'severity': 'orange',
+        'type': 'PHQ9_WATCH',
+        'patientCode': 'RJ-DEMO2',
+        'title': 'Mood trend needs follow-up',
+        'message': 'PHQ-9 remains moderately severe.',
+        'createdAt': now,
+      },
+      {
+        'severity': 'yellow',
+        'type': 'LOW_ACTIVITY',
+        'patientCode': 'RJ-DEMO2',
+        'title': 'CBT quest participation dropped',
+        'message': 'Consider low-energy care plan.',
+        'createdAt': now,
+      },
+    ],
+    'privacy': {
+      'diaryTextHidden': true,
+      'deidentifiedPatientCodes': true,
+      'note':
+          note ??
+          'Demo dashboard uses de-identified summary signals only. Raw diary text is hidden.',
+    },
+  };
 }

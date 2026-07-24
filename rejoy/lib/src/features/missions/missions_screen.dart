@@ -53,10 +53,12 @@ class MissionsScreen extends StatefulWidget {
     super.key,
     required this.session,
     required this.onEnergySelected,
+    this.onGoToIsland,
   });
 
   final ReJoySession session;
   final ValueChanged<EnergyLevel> onEnergySelected;
+  final VoidCallback? onGoToIsland;
 
   @override
   State<MissionsScreen> createState() => _MissionsScreenState();
@@ -598,6 +600,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
     final selectedQuestNames = _isRestDay
         ? <String>[]
         : _selectedQuests.map((quest) => quest.name).toList();
+    final wasRestDay = _isRestDay;
     final finishPayload = <String, dynamic>{
       'selectedQuests': selectedQuestNames,
       'completedQuests': completedQuests,
@@ -642,6 +645,12 @@ class _MissionsScreenState extends State<MissionsScreen> {
             'selected=${selectedQuestNames.length};completed=${completedQuests.length}',
       );
       await _loadBoard(keepSelection: false);
+      if (!wasRestDay && mounted) {
+        await _showQuestCompletionDialog(
+          selectedCount: selectedQuestNames.length,
+          completedCount: completedQuests.length,
+        );
+      }
     } catch (error) {
       await _localSyncService.enqueueQuestDayFinish(
         userId: user.id,
@@ -658,6 +667,74 @@ class _MissionsScreenState extends State<MissionsScreen> {
             'selected=${selectedQuestNames.length};completed=${completedQuests.length}',
       );
     }
+  }
+
+  Future<void> _showQuestCompletionDialog({
+    required int selectedCount,
+    required int completedCount,
+  }) {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFFF7FBF7),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+          ),
+          contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 18),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(
+                'assets/images/island_parts/rejoy_bot.png',
+                width: 108,
+                height: 108,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.high,
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'โอ้ ยินดีด้วยนะ',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFF17343C),
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'คุณทำภารกิจสำเร็จ $completedCount จาก $selectedCount เควสแล้ว '
+                'ดูเหมือนว่าพายุจะเบาลงแล้ว ไปดูกันดีกว่าว่าจะมีสัตว์ตัวไหนแวะเข้ามาบนเกาะของคุณ',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFF48636A),
+                  height: 1.45,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 18),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFE7B13D),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(46),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                  widget.onGoToIsland?.call();
+                },
+                icon: const Icon(Icons.pets_rounded),
+                label: const Text('ไปดูเกาะของฉัน'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -935,13 +1012,9 @@ class _CombinedDailyBoard extends StatelessWidget {
                 onAction: () => onReload(),
               )
             else if (availableQuests.isEmpty)
-              _StatusCard(
-                icon: Icons.inbox_outlined,
-                title: 'No quests found',
-                subtitle:
-                    'Try changing the energy filter or refresh the board.',
-                actionLabel: 'Refresh',
-                onAction: () => onReload(),
+              _QuestDeckEmptyCompanion(
+                selectedCount: selectedCount,
+                onReload: onReload,
               )
             else
               _QuestChargeDeck(
@@ -1339,6 +1412,84 @@ class _QuestChargeDeck extends StatelessWidget {
                 fontWeight: FontWeight.w800,
                 fontSize: 12,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuestDeckEmptyCompanion extends StatelessWidget {
+  const _QuestDeckEmptyCompanion({
+    required this.selectedCount,
+    required this.onReload,
+  });
+
+  final int selectedCount;
+  final Future<void> Function() onReload;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasSelected = selectedCount > 0;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF9F4),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFCFE4DC)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF6E8B84).withValues(alpha: 0.10),
+            blurRadius: 22,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Image.asset(
+            'assets/images/island_parts/rejoy_bot.png',
+            width: 78,
+            height: 78,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  hasSelected
+                      ? 'พักกองการ์ดไว้ก่อนนะ'
+                      : 'วันนี้ยังไม่มีเควสใหม่',
+                  style: const TextStyle(
+                    color: Color(0xFF17343C),
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  hasSelected
+                      ? 'คุณเลือกเควสไว้แล้ว ลองไปทำเท่าที่ไหวก่อนก็พอ ค่อยกลับมารับเพิ่มได้เสมอ ไม่มีอะไรต้องรีบเลยนะ'
+                      : 'ลองกดรีเฟรชหรือเปลี่ยนระดับพลังงานได้เลย ถ้ายังไม่พร้อมก็พักกับเราตรงนี้ก่อนได้',
+                  style: const TextStyle(
+                    color: Color(0xFF557079),
+                    height: 1.42,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextButton.icon(
+                  onPressed: () => onReload(),
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('ลองรับเควสใหม่'),
+                ),
+              ],
             ),
           ),
         ],

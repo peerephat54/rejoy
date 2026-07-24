@@ -17,91 +17,49 @@ class DoctorPdfService {
     final regularFont = await PdfGoogleFonts.notoSansThaiRegular();
     final boldFont = await PdfGoogleFonts.notoSansThaiBold();
     final document = pw.Document();
-    final fourteenDayReports = _last14Days(
-      reports.isEmpty ? [report] : reports,
-    );
-    final matrixAverage = _averageMatrix(fourteenDayReports);
-    final avgPhq9 = _averagePhq9(fourteenDayReports);
-    final avgCbt = _averageCbtRate(fourteenDayReports);
+    final periodReports = _last14Days(reports.isEmpty ? [report] : reports);
+    final latest = periodReports.isEmpty ? report : periodReports.first;
+    final previous = periodReports.length > 1 ? periodReports[1] : null;
+    final avgPhq9 = _averagePhq9(periodReports);
+    final avgCbt = _averageCbtRate(periodReports);
+    final matrixAverage = _averageMatrix(periodReports);
+    final phqDelta = previous == null
+        ? 0
+        : latest.phq9Score - previous.phq9Score;
+    final sosFlags = periodReports.where((item) => item.isSosTriggered).length;
+    final restDays = periodReports.where((item) => item.isRestDay).length;
 
     document.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(28),
+        margin: const pw.EdgeInsets.fromLTRB(28, 24, 28, 24),
         theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont),
-        build: (context) {
-          return [
-            _header(user, fourteenDayReports),
-            pw.SizedBox(height: 16),
-            _quickClinicalSummary(
-              avgPhq9: avgPhq9,
-              avgCbt: avgCbt,
-              restDays: fourteenDayReports
-                  .where((item) => item.isRestDay)
-                  .length,
-              sosFlags: fourteenDayReports
-                  .where((item) => item.isSosTriggered)
-                  .length,
-            ),
-            pw.SizedBox(height: 12),
-            _infoCard(
-              title: 'Soul Profile & Medical Background',
-              rows: [
-                _row('Name', user.fullName),
-                _row('Age', '${user.age}'),
-                _row('Allergies', _joinOrDash(user.allergies)),
-                _row(
-                  'Current medications',
-                  _joinOrDash(user.currentMedications),
-                ),
-                _row(
-                  'Emergency contacts',
-                  _joinOrDash(user.emergencyContactNumbers),
-                ),
-                _row(
-                  'Medical history',
-                  user.medicalHistory.isEmpty ? '-' : user.medicalHistory,
-                ),
-              ],
-            ),
-            pw.SizedBox(height: 12),
-            _infoCard(
-              title: '14-Day Clinical Snapshot',
-              rows: [
-                _row('Reports included', '${fourteenDayReports.length} day(s)'),
-                _row('Average PHQ-9', avgPhq9.toStringAsFixed(1)),
-                _row('Average CBT completion', '${avgCbt.toStringAsFixed(0)}%'),
-                _row(
-                  'Rest days',
-                  '${fourteenDayReports.where((item) => item.isRestDay).length}',
-                ),
-                _row(
-                  'SOS flags',
-                  '${fourteenDayReports.where((item) => item.isSosTriggered).length}',
-                ),
-              ],
-            ),
-            pw.SizedBox(height: 12),
-            _matrixCard(matrixAverage),
-            pw.SizedBox(height: 12),
-            _trendTable(fourteenDayReports),
-            pw.SizedBox(height: 12),
-            _diaryNotes(fourteenDayReports),
-            pw.SizedBox(height: 12),
-            pw.Container(
-              padding: const pw.EdgeInsets.all(14),
-              decoration: pw.BoxDecoration(
-                color: PdfColor.fromInt(0xFFF4FBFA),
-                borderRadius: pw.BorderRadius.circular(16),
-                border: pw.Border.all(color: PdfColor.fromInt(0xFFD7E6E3)),
-              ),
-              child: pw.Text(
-                'Clinical note: This report summarizes user-entered logs and DSM-5-aligned symptom domains (Mood, Somatic, Behavioral) for clinician review. It is not a diagnosis and should be interpreted by a qualified professional.',
-                style: const pw.TextStyle(fontSize: 10.5),
-              ),
-            ),
-          ];
-        },
+        build: (context) => [
+          _header(user, periodReports),
+          pw.SizedBox(height: 10),
+          _quickRead(
+            latest: latest,
+            phqDelta: phqDelta,
+            avgPhq9: avgPhq9,
+            avgCbt: avgCbt,
+            restDays: restDays,
+            sosFlags: sosFlags,
+          ),
+          pw.SizedBox(height: 10),
+          _medicalBackground(user),
+          pw.SizedBox(height: 10),
+          _clinicalQuestions(periodReports),
+          pw.SizedBox(height: 10),
+          _trendTable(periodReports),
+          pw.SizedBox(height: 10),
+          _matrixSummary(matrixAverage),
+          pw.SizedBox(height: 10),
+          _treatmentPrompts(user, periodReports),
+          pw.SizedBox(height: 10),
+          _diaryNotes(periodReports),
+          pw.SizedBox(height: 10),
+          _safetyNote(),
+        ],
       ),
     );
 
@@ -120,168 +78,239 @@ class DoctorPdfService {
     );
     await Printing.sharePdf(
       bytes: bytes,
-      filename: 'rejoy-clinical-14-day-report.pdf',
+      filename: 'rejoy-clinical-summary-report.pdf',
     );
   }
 
   pw.Widget _header(BackendUser user, List<ReportEntry> reports) {
     final latestDate = reports.isEmpty ? null : reports.first.date;
-    return pw.Container(
-      padding: const pw.EdgeInsets.all(18),
-      decoration: pw.BoxDecoration(
-        gradient: pw.LinearGradient(
-          colors: [PdfColor.fromInt(0xFFDDF0ED), PdfColor.fromInt(0xFFF7F2E8)],
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(
+          'ReJoy Clinical Summary Report',
+          style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold),
         ),
-        borderRadius: pw.BorderRadius.circular(24),
-      ),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text(
-            'ReJoy Clinical 14-Day Report',
-            style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold),
-          ),
-          pw.SizedBox(height: 6),
-          pw.Text(
-            'One-minute summary for doctor review and medication discussion',
-            style: const pw.TextStyle(fontSize: 11.5),
-          ),
-          pw.SizedBox(height: 10),
-          pw.Text(
-            '${user.fullName} • Latest log ${_formatDate(latestDate)}',
-            style: pw.TextStyle(fontSize: 12.5, fontWeight: pw.FontWeight.bold),
-          ),
-        ],
-      ),
+        pw.SizedBox(height: 4),
+        pw.Text(
+          'Pre-visit handoff for clinician review. Data comes from patient-entered app logs and must be verified in consultation.',
+          style: const pw.TextStyle(fontSize: 10),
+        ),
+        pw.SizedBox(height: 8),
+        _keyValueTable([
+          ['Patient', user.fullName.isEmpty ? user.email : user.fullName],
+          ['Latest log', _formatDate(latestDate)],
+          [
+            'Report window',
+            '${reports.length} log(s), latest 14 days if available',
+          ],
+        ]),
+        pw.SizedBox(height: 8),
+        pw.Divider(thickness: 1.2, color: PdfColor.fromInt(0xFF17343C)),
+      ],
     );
   }
 
-  pw.Widget _matrixCard(ReportSymptomMatrix matrix) {
-    final total =
-        (matrix.moodScore + matrix.somaticScore + matrix.behavioralScore).clamp(
-          1,
-          999,
-        );
-
-    return pw.Container(
-      width: double.infinity,
-      padding: const pw.EdgeInsets.all(16),
-      decoration: pw.BoxDecoration(
-        color: PdfColors.white,
-        borderRadius: pw.BorderRadius.circular(18),
-        border: pw.Border.all(color: PdfColor.fromInt(0xFFD7E6E3)),
-      ),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text(
-            'Symptom Matrix: Mood / Somatic / Behavioral Axis',
-            style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
-          ),
-          pw.SizedBox(height: 10),
-          _axisBar(
-            'Mood axis',
-            matrix.moodScore,
-            total,
-            PdfColor.fromInt(0xFF6D9EEB),
-          ),
-          _axisBar(
-            'Somatic axis',
-            matrix.somaticScore,
-            total,
-            PdfColor.fromInt(0xFFF6B26B),
-          ),
-          _axisBar(
-            'Behavioral axis',
-            matrix.behavioralScore,
-            total,
-            PdfColor.fromInt(0xFF93C47D),
-          ),
-        ],
-      ),
-    );
-  }
-
-  pw.Widget _quickClinicalSummary({
+  pw.Widget _quickRead({
+    required ReportEntry latest,
+    required int phqDelta,
     required double avgPhq9,
     required double avgCbt,
     required int restDays,
     required int sosFlags,
   }) {
-    final risk = _phq9Band(avgPhq9.round());
-    final riskColor = sosFlags > 0
-        ? PdfColor.fromInt(0xFFE57373)
-        : PdfColor.fromInt(0xFF62A7A5);
-    return pw.Container(
-      width: double.infinity,
-      padding: const pw.EdgeInsets.all(16),
-      decoration: pw.BoxDecoration(
-        color: PdfColor.fromInt(0xFFF7FBFA),
-        borderRadius: pw.BorderRadius.circular(18),
-        border: pw.Border.all(color: riskColor),
-      ),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text(
-            'Doctor Quick Read',
-            style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold),
-          ),
-          pw.SizedBox(height: 8),
-          _row('PHQ-9 risk band', risk),
-          _row('Average CBT participation', '${avgCbt.toStringAsFixed(0)}%'),
-          _row('Rest / recovery days', '$restDays day(s)'),
-          _row('SOS flags', '$sosFlags time(s)'),
-          pw.SizedBox(height: 6),
-          pw.Text(
-            'Suggested use: review trend, diary notes, rest days, and SOS flags with the patient. Do not use this report alone to diagnose or adjust medication.',
-            style: const pw.TextStyle(fontSize: 10.5),
-          ),
-        ],
-      ),
+    final urgent = latest.phq9Score >= 20 || sosFlags > 0;
+    return _section(
+      urgent ? 'Doctor Quick Read - priority review' : 'Doctor Quick Read',
+      subtitle:
+          '60-second summary. Use this to decide what to ask first, not as an automated diagnosis.',
+      children: [
+        _keyValueTable([
+          [
+            'Latest PHQ-9',
+            '${latest.phq9Score}/27 | ${_phq9Band(latest.phq9Score)}',
+          ],
+          ['Change vs prior log', _formatDelta(phqDelta)],
+          ['Average PHQ-9', avgPhq9.toStringAsFixed(1)],
+          [
+            'Latest mood label',
+            latest.dailyMood.isEmpty ? '-' : latest.dailyMood,
+          ],
+          ['CBT participation avg.', '${avgCbt.toStringAsFixed(0)}%'],
+          ['Rest / recovery days', '$restDays day(s)'],
+          ['SOS flags', '$sosFlags time(s)'],
+          [
+            'First clinical check',
+            urgent
+                ? 'Start with safety plan, self-harm thoughts, support person, and crisis resources.'
+                : 'Confirm mood, sleep, appetite, energy, functioning, medication adherence, and side effects.',
+          ],
+        ]),
+      ],
     );
   }
 
-  pw.Widget _axisBar(String label, int value, int total, PdfColor color) {
-    final width = (value / total * 250).clamp(12, 250).toDouble();
-    return pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 8),
-      child: pw.Row(
-        children: [
-          pw.SizedBox(
-            width: 110,
-            child: pw.Text(label, style: const pw.TextStyle(fontSize: 11)),
-          ),
-          pw.Container(
-            width: width,
-            height: 10,
-            decoration: pw.BoxDecoration(
-              color: color,
-              borderRadius: pw.BorderRadius.circular(99),
-            ),
-          ),
-          pw.SizedBox(width: 8),
-          pw.Text(
-            '$value',
-            style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
-          ),
-        ],
-      ),
+  pw.Widget _medicalBackground(BackendUser user) {
+    return _section(
+      '1. Medical background to verify',
+      subtitle:
+          'Basic information that should be confirmed directly with the patient.',
+      children: [
+        _keyValueTable([
+          ['Age', user.age == 0 ? '-' : '${user.age}'],
+          ['Allergies', _joinOrDash(user.allergies)],
+          ['Current medications', _joinOrDash(user.currentMedications)],
+          [
+            'Medical history',
+            user.medicalHistory.isEmpty ? '-' : user.medicalHistory,
+          ],
+          ['Emergency contacts', _joinOrDash(user.emergencyContactNumbers)],
+        ]),
+      ],
+    );
+  }
+
+  pw.Widget _clinicalQuestions(List<ReportEntry> reports) {
+    final highPhqDays = reports.where((item) => item.phq9Score >= 15).length;
+    final severeDays = reports.where((item) => item.phq9Score >= 20).length;
+    final sosDays = reports.where((item) => item.isSosTriggered).length;
+    final lowCbtDays = reports
+        .where(
+          (item) =>
+              !item.isRestDay && _parseCbtRate(item.cbtCompletionRate) < 50,
+        )
+        .length;
+
+    return _section(
+      '2. Clinical flags to ask today',
+      subtitle:
+          'Question prompts designed to save time and reduce recall bias.',
+      children: [
+        _keyValueTable([
+          [
+            'Safety / SOS',
+            sosDays > 0
+                ? '$sosDays SOS flag(s). Ask about current safety, plan, intent, means, and support.'
+                : 'No SOS flag in this report window.',
+          ],
+          [
+            'PHQ-9 elevation',
+            '$highPhqDays day(s) >= 15, $severeDays day(s) >= 20. Verify severity and PHQ-9 item 9.',
+          ],
+          [
+            'Function / activity',
+            '$lowCbtDays low-activity day(s). Ask about school/home functioning, withdrawal, and barriers.',
+          ],
+          [
+            'Recovery days',
+            '${reports.where((item) => item.isRestDay).length} rest day(s). Confirm whether rest was protective or avoidance.',
+          ],
+        ]),
+      ],
     );
   }
 
   pw.Widget _trendTable(List<ReportEntry> reports) {
-    return _infoCard(
-      title: 'Daily Trend Table',
-      rows: reports
-          .take(14)
-          .map(
-            (report) => _row(
-              _formatDate(report.date),
-              'PHQ-9 ${report.phq9Score} | CBT ${report.cbtCompletionRate} | Mood ${report.dailyMood.isEmpty ? '-' : report.dailyMood}',
-            ),
+    final rows = reports.take(14).map((item) {
+      final markers = [
+        if (item.isRestDay) 'REST',
+        if (item.isSosTriggered) 'SOS',
+      ].join(', ');
+      return [
+        _formatDateShort(item.date),
+        '${item.phq9Score}',
+        '${_parseCbtRate(item.cbtCompletionRate).round()}%',
+        item.dailyMood.isEmpty ? '-' : item.dailyMood,
+        markers.isEmpty ? '-' : markers,
+      ];
+    }).toList();
+
+    return _section(
+      '3. Trend summary',
+      subtitle:
+          'Latest logs first. PHQ-9 uses 0-27 scale; CBT uses completion percentage.',
+      children: [
+        if (rows.isEmpty)
+          pw.Text(
+            'No trend data available.',
+            style: const pw.TextStyle(fontSize: 10.5),
           )
-          .toList(),
+        else
+          _dataTable(
+            headers: ['Date', 'PHQ-9', 'CBT', 'Mood label', 'Marker'],
+            rows: rows,
+            widths: const {
+              0: pw.FixedColumnWidth(54),
+              1: pw.FixedColumnWidth(42),
+              2: pw.FixedColumnWidth(42),
+              3: pw.FlexColumnWidth(),
+              4: pw.FixedColumnWidth(62),
+            },
+          ),
+      ],
+    );
+  }
+
+  pw.Widget _matrixSummary(ReportSymptomMatrix matrix) {
+    return _section(
+      '4. Symptom matrix',
+      subtitle:
+          'Mood, somatic, and behavioral signals from app logs. Use as interview prompts.',
+      children: [
+        _keyValueTable([
+          [
+            'Mood axis',
+            '${matrix.moodScore} | ask hopelessness, guilt, concentration, irritability.',
+          ],
+          [
+            'Somatic axis',
+            '${matrix.somaticScore} | ask sleep, appetite, fatigue, psychomotor change.',
+          ],
+          [
+            'Behavioral axis',
+            '${matrix.behavioralScore} | ask withdrawal, daily routine, school/home function.',
+          ],
+        ]),
+      ],
+    );
+  }
+
+  pw.Widget _treatmentPrompts(BackendUser user, List<ReportEntry> reports) {
+    final latest = reports.isEmpty ? null : reports.first;
+    final avgCbt = _averageCbtRate(reports);
+    return _section(
+      '5. Medication & treatment discussion prompts',
+      subtitle:
+          'Useful questions before medication discussion or care-plan adjustment.',
+      children: [
+        _keyValueTable([
+          [
+            'Current medications to confirm',
+            _joinOrDash(user.currentMedications),
+          ],
+          ['Allergy check', _joinOrDash(user.allergies)],
+          [
+            'Adherence / side effects',
+            'Ask whether missed doses, sedation, nausea, sleep change, appetite change, or agitation affected routine.',
+          ],
+          [
+            'Activity clue',
+            avgCbt < 40
+                ? 'Low CBT completion. Ask about energy, motivation, daily structure, and barriers.'
+                : 'Activity participation appears relatively consistent.',
+          ],
+          [
+            'Latest animal/rest context',
+            latest == null
+                ? '-'
+                : latest.isRestDay
+                ? 'Rest day logged'
+                : latest.unlockedAnimalToday.isEmpty
+                ? '-'
+                : latest.unlockedAnimalToday,
+          ],
+        ]),
+      ],
     );
   }
 
@@ -289,90 +318,154 @@ class DoctorPdfService {
     final notes = reports
         .where((item) => item.diaryNote.trim().isNotEmpty)
         .take(8)
-        .map((item) => '${_formatDate(item.date)}: ${item.diaryNote}')
+        .map((item) => [_formatDate(item.date), item.diaryNote.trim()])
         .toList();
 
-    return pw.Container(
-      width: double.infinity,
-      padding: const pw.EdgeInsets.all(16),
-      decoration: pw.BoxDecoration(
-        color: PdfColor.fromInt(0xFFFDF8EC),
-        borderRadius: pw.BorderRadius.circular(18),
-        border: pw.Border.all(color: PdfColor.fromInt(0xFFE6D7A5)),
-      ),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
+    return _section(
+      '6. Diary notes / patient words',
+      subtitle:
+          'Patient-entered notes are included as context. Confirm meaning directly and avoid interpreting them alone.',
+      children: [
+        if (notes.isEmpty)
           pw.Text(
-            'Diary Notes / ความในใจ',
-            style: pw.TextStyle(
-              fontSize: 15,
-              fontWeight: pw.FontWeight.bold,
-              color: PdfColor.fromInt(0xFF5D4B1D),
-            ),
+            'No diary note submitted.',
+            style: const pw.TextStyle(fontSize: 10.5),
+          )
+        else
+          _dataTable(
+            headers: ['Date', 'Patient note'],
+            rows: notes,
+            widths: const {0: pw.FixedColumnWidth(76), 1: pw.FlexColumnWidth()},
           ),
-          pw.SizedBox(height: 8),
-          if (notes.isEmpty)
-            pw.Text(
-              'No diary note submitted.',
-              style: const pw.TextStyle(fontSize: 11.5),
-            )
-          else
-            ...notes.map(
-              (note) => pw.Padding(
-                padding: const pw.EdgeInsets.only(bottom: 6),
-                child: pw.Text(note, style: const pw.TextStyle(fontSize: 11.5)),
-              ),
-            ),
-        ],
-      ),
+      ],
     );
   }
 
-  pw.Widget _infoCard({required String title, required List<pw.Widget> rows}) {
-    return pw.Container(
-      width: double.infinity,
-      padding: const pw.EdgeInsets.all(16),
-      decoration: pw.BoxDecoration(
-        color: PdfColors.white,
-        borderRadius: pw.BorderRadius.circular(18),
-        border: pw.Border.all(color: PdfColor.fromInt(0xFFD7E6E3)),
-      ),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text(
-            title,
-            style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
-          ),
-          pw.SizedBox(height: 10),
-          ...rows,
-        ],
-      ),
+  pw.Widget _safetyNote() {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(
+          'Important safety note',
+          style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+        ),
+        pw.SizedBox(height: 3),
+        pw.Text(
+          'ReJoy supports tracking and preparation for care. It does not diagnose, prescribe, replace clinical judgment, or provide 24/7 emergency monitoring.',
+          style: const pw.TextStyle(fontSize: 9.5),
+        ),
+      ],
     );
   }
 
-  pw.Widget _row(String label, String value) {
-    return pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 6),
-      child: pw.Row(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.SizedBox(
-            width: 132,
-            child: pw.Text(label, style: const pw.TextStyle(fontSize: 11.5)),
-          ),
-          pw.Expanded(
-            child: pw.Text(
-              value,
-              style: pw.TextStyle(
-                fontSize: 11.5,
-                fontWeight: pw.FontWeight.bold,
+  pw.Widget _section(
+    String title, {
+    String? subtitle,
+    required List<pw.Widget> children,
+  }) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(
+          title,
+          style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+        ),
+        if (subtitle != null) ...[
+          pw.SizedBox(height: 2),
+          pw.Text(subtitle, style: const pw.TextStyle(fontSize: 9.4)),
+        ],
+        pw.SizedBox(height: 5),
+        pw.Divider(color: PdfColor.fromInt(0xFFD7E6E3)),
+        pw.SizedBox(height: 5),
+        ...children,
+      ],
+    );
+  }
+
+  pw.Widget _keyValueTable(List<List<String>> rows) {
+    return pw.Table(
+      columnWidths: const {
+        0: pw.FixedColumnWidth(150),
+        1: pw.FlexColumnWidth(),
+      },
+      border: pw.TableBorder(
+        horizontalInside: pw.BorderSide(
+          color: PdfColor.fromInt(0xFFE7EFED),
+          width: 0.5,
+        ),
+      ),
+      children: rows.map((row) {
+        return pw.TableRow(
+          children: [
+            pw.Padding(
+              padding: const pw.EdgeInsets.fromLTRB(0, 4, 8, 4),
+              child: pw.Text(row[0], style: const pw.TextStyle(fontSize: 10)),
+            ),
+            pw.Padding(
+              padding: const pw.EdgeInsets.symmetric(vertical: 4),
+              child: pw.Text(
+                row[1],
+                style: pw.TextStyle(
+                  fontSize: 10,
+                  fontWeight: pw.FontWeight.bold,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        );
+      }).toList(),
+    );
+  }
+
+  pw.Widget _dataTable({
+    required List<String> headers,
+    required List<List<String>> rows,
+    required Map<int, pw.TableColumnWidth> widths,
+  }) {
+    return pw.Table(
+      columnWidths: widths,
+      border: pw.TableBorder(
+        top: pw.BorderSide(color: PdfColor.fromInt(0xFFBFD6D1)),
+        bottom: pw.BorderSide(color: PdfColor.fromInt(0xFFBFD6D1)),
+        horizontalInside: pw.BorderSide(
+          color: PdfColor.fromInt(0xFFE7EFED),
+          width: 0.5,
+        ),
       ),
+      children: [
+        pw.TableRow(
+          decoration: pw.BoxDecoration(color: PdfColor.fromInt(0xFFF4FBFA)),
+          children: headers
+              .map(
+                (header) => pw.Padding(
+                  padding: const pw.EdgeInsets.all(5),
+                  child: pw.Text(
+                    header,
+                    style: pw.TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+        ...rows.map(
+          (row) => pw.TableRow(
+            children: row
+                .map(
+                  (cell) => pw.Padding(
+                    padding: const pw.EdgeInsets.all(5),
+                    child: pw.Text(
+                      cell,
+                      style: const pw.TextStyle(fontSize: 9.2),
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+        ),
+      ],
     );
   }
 
@@ -455,6 +548,15 @@ class DoctorPdfService {
     return 'Severe (20-27)';
   }
 
+  String _formatDelta(int value) {
+    if (value == 0) return 'No change from prior log';
+    final sign = value > 0 ? '+' : '';
+    final direction = value > 0
+        ? 'higher risk than prior log'
+        : 'lower than prior log';
+    return '$sign$value point(s), $direction';
+  }
+
   String _joinOrDash(List<String> values) {
     final cleaned = values.where((item) => item.trim().isNotEmpty).toList();
     return cleaned.isEmpty ? '-' : cleaned.join(', ');
@@ -463,5 +565,10 @@ class DoctorPdfService {
   String _formatDate(DateTime? date) {
     if (date == null) return '-';
     return '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  String _formatDateShort(DateTime? date) {
+    if (date == null) return '-';
+    return '${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
   }
 }

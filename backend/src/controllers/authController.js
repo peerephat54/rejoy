@@ -2,6 +2,7 @@ const User = require('../models/User');
 const { createRefreshToken, hashRefreshToken, signAuthToken } = require('../utils/token');
 
 const SAFE_USER_FIELDS = '-passwordHash';
+const SELF_REGISTER_ROLES = new Set(['patient', 'doctor']);
 
 function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
@@ -21,6 +22,16 @@ function assertValidPassword(password) {
     error.statusCode = 400;
     throw error;
   }
+}
+
+function normalizeRole(role) {
+  const normalized = String(role || 'patient').trim().toLowerCase();
+  if (!SELF_REGISTER_ROLES.has(normalized)) {
+    const error = new Error('Role must be patient or doctor');
+    error.statusCode = 400;
+    throw error;
+  }
+  return normalized;
 }
 
 function publicUser(user) {
@@ -58,7 +69,9 @@ async function register(req, res, next) {
       firstName = 'ReJoy',
       surname = 'Friend',
       age = 0,
+      role,
     } = req.body;
+    const normalizedRole = normalizeRole(role);
 
     assertValidEmail(email);
     assertValidPassword(password);
@@ -72,8 +85,10 @@ async function register(req, res, next) {
       firstName,
       surname,
       age,
+      role: normalizedRole,
       email,
       authProvider: 'email',
+      onboardingComplete: normalizedRole !== 'patient',
       allergies: [],
       emergencyContactNumbers: [],
       currentMedications: [],

@@ -323,8 +323,8 @@ class _IslandScreenState extends State<IslandScreen>
           builder: (context, constraints) {
             return Transform.translate(
               offset: Offset(
-                constraints.maxWidth * pos.dx + sway - 26,
-                constraints.maxHeight * pos.dy + bob - 26,
+                constraints.maxWidth * pos.dx + sway - (animal.size * 0.5),
+                constraints.maxHeight * pos.dy + bob - (animal.size * 0.5),
               ),
               child: Align(
                 alignment: Alignment.topLeft,
@@ -644,13 +644,19 @@ class _GloomyCloudCanopy extends StatelessWidget {
     final cloudAsset = weather.kind == _WeatherKind.cloudy
         ? 'assets/images/island_parts/cloud_neutral.png'
         : 'assets/images/island_parts/cloud_sad.png';
-    final stormAlpha = weather.kind == _WeatherKind.cloudy ? 0.70 : 0.86;
-    final drift = math.sin(progress * math.pi * 2) * 14;
+    final stormAlpha = weather.kind == _WeatherKind.cloudy ? 0.88 : 0.96;
+    final drift = math.sin(progress * math.pi * 2) * 24;
+    final cloudHeight = switch (weather.kind) {
+      _WeatherKind.cloudy => 230.0,
+      _WeatherKind.rain => 258.0,
+      _WeatherKind.storm => 292.0,
+      _WeatherKind.sunny => 0.0,
+    };
     return IgnorePointer(
       child: Opacity(
         opacity: stormAlpha,
         child: Transform.translate(
-          offset: Offset(drift, 0),
+          offset: Offset(drift, weather.kind == _WeatherKind.storm ? -8 : -2),
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 520),
             switchInCurve: Curves.easeOutCubic,
@@ -658,7 +664,7 @@ class _GloomyCloudCanopy extends StatelessWidget {
             child: Image.asset(
               cloudAsset,
               key: ValueKey(cloudAsset),
-              height: weather.kind == _WeatherKind.cloudy ? 126 : 138,
+              height: cloudHeight,
               fit: BoxFit.cover,
               filterQuality: FilterQuality.high,
             ),
@@ -681,64 +687,35 @@ class _ChatBotPortalButton extends StatelessWidget {
     return Tooltip(
       message: 'คุยกับ ReJoy bot',
       child: InkWell(
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(36),
         onTap: onPressed,
         child: Transform.translate(
           offset: Offset(0, bob),
           child: Container(
-            width: 68,
-            height: 68,
+            width: 116,
+            height: 116,
+            alignment: Alignment.center,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFFE9FBFF),
-                  Color(0xFFD7C8FF),
-                  Color(0xFFFFE3D7),
-                ],
-              ),
+              shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF233644).withValues(alpha: 0.34),
-                  blurRadius: 18,
-                  offset: const Offset(0, 10),
+                  color: const Color(0xFF12333C).withValues(alpha: 0.18),
+                  blurRadius: 24,
+                  offset: const Offset(0, 12),
+                ),
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: 0.32),
+                  blurRadius: 20,
+                  spreadRadius: 4,
                 ),
               ],
             ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Container(
-                  width: 58,
-                  height: 58,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.white.withValues(alpha: 0.92),
-                        const Color(0xFFE5FBFF).withValues(alpha: 0.86),
-                      ],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF4F8791).withValues(alpha: 0.20),
-                        blurRadius: 12,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: Image.asset(
-                      'assets/images/island_parts/rejoy_bot.png',
-                      fit: BoxFit.contain,
-                      filterQuality: FilterQuality.high,
-                    ),
-                  ),
-                ),
-              ],
+            child: Image.asset(
+              'assets/images/island_parts/rejoy_bot.png',
+              width: 112,
+              height: 112,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
             ),
           ),
         ),
@@ -1601,16 +1578,33 @@ class _IslandPainter extends CustomPainter {
   }
 
   void _drawRain(Canvas canvas, Size size) {
-    final rainPaint = Paint()
-      ..color = Colors.white.withValues(
-        alpha: weather.kind == _WeatherKind.storm ? 0.36 : 0.24,
-      )
-      ..strokeWidth = weather.kind == _WeatherKind.storm ? 1.7 : 1.2
-      ..strokeCap = StrokeCap.round;
-    for (var i = 0; i < 42; i++) {
-      final x = (i * 37.0 + progress * 190) % (size.width + 80) - 40;
-      final y = (i * 61.0 + progress * 360) % (size.height + 80) - 40;
-      canvas.drawLine(Offset(x, y), Offset(x - 12, y + 32), rainPaint);
+    final isStorm = weather.kind == _WeatherKind.storm;
+    final layerCount = isStorm ? 2 : 1;
+    for (var layer = 0; layer < layerCount; layer++) {
+      final count = isStorm ? 16 + layer * 10 : 14;
+      final speed = isStorm ? 220.0 + layer * 110 : 170.0;
+      final slant = isStorm ? 15.0 + layer * 5 : 9.0;
+      final rainPaint = Paint()
+        ..color = const Color(
+          0xFFDDEFF6,
+        ).withValues(alpha: (isStorm ? 0.13 : 0.09) + layer * 0.05)
+        ..strokeWidth = (isStorm ? 0.75 : 0.55) + layer * 0.25
+        ..strokeCap = StrokeCap.round;
+
+      for (var i = 0; i < count; i++) {
+        final seed = i * 19.37 + layer * 53.11;
+        final jitter = math.sin(seed) * 18;
+        final length = (isStorm ? 24.0 : 18.0) + layer * 9 + math.cos(seed) * 6;
+        final x =
+            (i * (29.0 + layer * 7) + progress * speed + jitter) %
+                (size.width + 140) -
+            70;
+        final y =
+            (i * (43.0 + layer * 5) + progress * (speed * 1.7)) %
+                (size.height + 160) -
+            80;
+        canvas.drawLine(Offset(x, y), Offset(x - slant, y + length), rainPaint);
+      }
     }
   }
 
@@ -1650,30 +1644,55 @@ class _FrontWeatherPainter extends CustomPainter {
       return;
     }
 
+    final isStorm = weather.kind == _WeatherKind.storm;
     final rainPaint = Paint()
-      ..color = Colors.white.withValues(
-        alpha: weather.kind == _WeatherKind.storm ? 0.46 : 0.30,
-      )
-      ..strokeWidth = weather.kind == _WeatherKind.storm ? 2.1 : 1.5
+      ..color = const Color(0xFFE9F7FA).withValues(alpha: isStorm ? 0.30 : 0.18)
+      ..strokeWidth = isStorm ? 1.45 : 1.0
       ..strokeCap = StrokeCap.round;
     final highlightPaint = Paint()
-      ..color = const Color(0xFFCDEBFF).withValues(alpha: 0.22)
-      ..strokeWidth = 5.5
+      ..color = const Color(0xFFFFFFFF).withValues(alpha: isStorm ? 0.13 : 0.08)
+      ..strokeWidth = isStorm ? 3.4 : 2.4
       ..strokeCap = StrokeCap.round
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
 
-    for (var i = 0; i < 68; i++) {
-      final x = (i * 31.0 + progress * 260) % (size.width + 120) - 60;
-      final y = (i * 47.0 + progress * 520) % (size.height + 120) - 60;
+    final count = isStorm ? 28 : 18;
+    for (var i = 0; i < count; i++) {
+      final seed = i * 24.91;
+      final length = (isStorm ? 44.0 : 30.0) + math.sin(seed) * 10;
+      final x =
+          (i * 41.0 + progress * (isStorm ? 300 : 200) + math.cos(seed) * 22) %
+              (size.width + 150) -
+          75;
+      final y =
+          (i * 59.0 + progress * (isStorm ? 560 : 380)) % (size.height + 150) -
+          75;
       final start = Offset(x, y);
-      final end = Offset(x - 16, y + 46);
-      if (i % 11 == 0) {
+      final end = Offset(x - (isStorm ? 18 : 12), y + length);
+      if (i % (isStorm ? 10 : 16) == 0) {
         canvas.drawLine(start, end, highlightPaint);
       }
       canvas.drawLine(start, end, rainPaint);
     }
 
-    if (weather.kind == _WeatherKind.storm) {
+    final splashPaint = Paint()
+      ..color = const Color(0xFFD9F4FF).withValues(alpha: isStorm ? 0.16 : 0.09)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.8;
+    final splashBaseY = size.height * 0.79;
+    for (var i = 0; i < (isStorm ? 9 : 5); i++) {
+      final x = (i * 49.0 + progress * 170) % (size.width + 80) - 40;
+      final y = splashBaseY + math.sin(progress * math.pi * 2 + i) * 18;
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: Offset(x, y),
+          width: isStorm ? 18 : 12,
+          height: isStorm ? 5 : 3,
+        ),
+        splashPaint,
+      );
+    }
+
+    if (isStorm) {
       final flash = math.sin(progress * math.pi * 8);
       if (flash > 0.86) {
         canvas.drawRect(
@@ -1977,50 +1996,50 @@ class _PastelAnimal {
       return const _PastelAnimal(
         name: 'อ้วนแดง',
         assetPath: 'assets/images/island_parts/animal_red_panda.png',
-        size: 72,
+        size: 90,
       );
     }
     if (normalized.contains('capy') || normalized.contains('otter')) {
       return const _PastelAnimal(
         name: 'คาปิลิ้นเปื่อย',
         assetPath: 'assets/images/island_parts/animal_capybara.png',
-        size: 76,
+        size: 92,
       );
     }
     if (normalized.contains('koala')) {
       return const _PastelAnimal(
         name: 'อ้วน',
         assetPath: 'assets/images/island_parts/animal_koala.png',
-        size: 70,
+        size: 88,
       );
     }
     if (normalized.contains('panda')) {
       return const _PastelAnimal(
         name: 'แพนแพน',
         assetPath: 'assets/images/island_parts/animal_panda.png',
-        size: 72,
+        size: 94,
       );
     }
     const fallback = [
       _PastelAnimal(
         name: 'แพนแพน',
         assetPath: 'assets/images/island_parts/animal_panda.png',
-        size: 72,
+        size: 94,
       ),
       _PastelAnimal(
         name: 'อ้วนแดง',
         assetPath: 'assets/images/island_parts/animal_red_panda.png',
-        size: 72,
+        size: 90,
       ),
       _PastelAnimal(
         name: 'คาปิลิ้นเปื่อย',
         assetPath: 'assets/images/island_parts/animal_capybara.png',
-        size: 76,
+        size: 92,
       ),
       _PastelAnimal(
         name: 'อ้วน',
         assetPath: 'assets/images/island_parts/animal_koala.png',
-        size: 70,
+        size: 88,
       ),
     ];
     return fallback[index % fallback.length];
