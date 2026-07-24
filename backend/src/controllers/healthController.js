@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Quest = require("../models/Quest");
 const { getMongoPoolConfig } = require("../config/db");
+const { getGeminiConfig } = require("./chatController");
 
 function getHealth(req, res) {
   res.json({
@@ -21,6 +22,8 @@ async function getDeepHealth(req, res, next) {
       dbReady ? mongoose.connection.db.admin().ping() : Promise.resolve(null),
     ]);
 
+    const gemini = getGeminiConfig();
+
     res.json({
       status: dbReady ? "ok" : "degraded",
       service: "rejoy-backend",
@@ -28,7 +31,8 @@ async function getDeepHealth(req, res, next) {
       dbPingOk: dbPing?.ok === 1,
       activeQuestCount: questCount,
       questSeedReady: questCount >= 10,
-      geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
+      geminiConfigured: gemini.configured,
+      geminiModel: gemini.model,
       mongoPool: getMongoPoolConfig(),
       nodeEnv: process.env.NODE_ENV || "development",
       timestamp: new Date().toISOString(),

@@ -16,6 +16,10 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: GEMINI_TIMEOUT_MS
+        value: 8000
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_EXPIRES_IN
@@ -44,4 +48,3 @@ services:
         value: 10000
       - key: MONGODB_HEARTBEAT_FREQUENCY_MS
         value: 10000
-

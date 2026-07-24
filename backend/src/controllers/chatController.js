@@ -1,16 +1,29 @@
+const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+const DEFAULT_GEMINI_TIMEOUT_MS = 8000;
+
 const HOTLINE_TEXT =
   "ถ้าตอนนี้ไม่ปลอดภัยหรืออยากคุยกับคนจริง ๆ โทรสายด่วนสุขภาพจิต 1323 ได้เลยนะ เขามีคนรับฟังและช่วยประคองสถานการณ์";
 
 const SAFETY_PROMPT = `
-You are ReJoy, a gentle Thai teen companion, not a doctor.
-Speak like a caring friend who is present, warm, and not dramatic.
-After the daily screening is done, continue normal supportive conversation.
-Do not diagnose. Do not prescribe, recommend, stop, increase, decrease, or change medication.
+You are ReJoy Buddy, a gentle Thai teen mental-health companion, not a doctor.
+Speak like a caring friend: warm, concise, non-judgmental, and guilt-free.
+You may support reflection and daily check-ins, but you must not diagnose.
+You must not prescribe, stop, increase, decrease, or change medication.
 If medication is mentioned, say you cannot decide about medicine and suggest asking a doctor, pharmacist, qualified expert, or hotline 1323.
 If the user mentions immediate self-harm danger, encourage staying near a trusted person and contacting hotline 1323 immediately.
 Ask at most one soft follow-up question.
-Keep replies short, Thai, non-judgmental, and guilt-free.
+Keep the reply in Thai and keep it short enough for a mobile chat bubble.
 `;
+
+const PLACEHOLDER_KEYS = new Set([
+  "",
+  "your_gemini_api_key_here",
+  "demo-no-gemini",
+  "demo_no_gemini",
+  "none",
+  "null",
+  "undefined",
+]);
 
 const RED_FLAG_PATTERNS = [
   /อยากตาย/i,
@@ -24,13 +37,40 @@ const RED_FLAG_PATTERNS = [
   /self[-\s]?harm/i,
 ];
 
-function hasAny(text, signals) {
-  return signals.some((signal) => text.includes(signal));
+const MEDICATION_PATTERNS = [
+  /ยา/i,
+  /หยุดยา/i,
+  /เพิ่มยา/i,
+  /ลดยา/i,
+  /กินยา/i,
+  /med/i,
+  /medicine/i,
+  /dose/i,
+];
+
+function getGeminiConfig() {
+  const apiKey = String(process.env.GEMINI_API_KEY || "").trim();
+  const normalizedKey = apiKey.toLowerCase();
+  const configured = apiKey.length > 0 && !PLACEHOLDER_KEYS.has(normalizedKey);
+
+  return {
+    apiKey,
+    configured,
+    model: String(process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL).trim(),
+    timeoutMs: Number(process.env.GEMINI_TIMEOUT_MS || DEFAULT_GEMINI_TIMEOUT_MS),
+  };
+}
+
+function hasPattern(text, patterns) {
+  return patterns.some((pattern) => pattern.test(text));
 }
 
 function detectRedFlag(message = "") {
-  const text = String(message);
-  return RED_FLAG_PATTERNS.some((pattern) => pattern.test(text));
+  return hasPattern(String(message), RED_FLAG_PATTERNS);
+}
+
+function detectMedicationTopic(message = "") {
+  return hasPattern(String(message), MEDICATION_PATTERNS);
 }
 
 function safetyInterceptionReply() {
@@ -39,58 +79,41 @@ function safetyInterceptionReply() {
     riskLevel: "red",
     blockedAi: true,
     message:
-      "เราเป็นห่วงความปลอดภัยของคุณมากนะ ข้อความนี้จะไม่ถูกส่งต่อไป AI ตอนนี้ขอให้ขยับไปอยู่ใกล้คนที่ไว้ใจได้ หรือโทร 1323 เพื่อให้มีคนจริง ๆ อยู่กับคุณทันที",
+      "เราห่วงความปลอดภัยของคุณมากนะ ข้อความนี้จะไม่ถูกส่งต่อไป AI ตอนนี้ขอให้ขยับไปอยู่ใกล้คนที่ไว้ใจได้ หรือโทร 1323 เพื่อให้มีคนจริง ๆ อยู่กับคุณทันที",
   };
 }
 
 function fallbackReply(message = "") {
-  const normalized = String(message).toLowerCase();
+  const text = String(message);
 
-  if (detectRedFlag(normalized)) {
+  if (detectRedFlag(text)) {
     return safetyInterceptionReply().message;
   }
 
-  if (
-    hasAny(normalized, [
-      "ยา",
-      "หยุดยา",
-      "เพิ่มยา",
-      "ลดยา",
-      "กินยา",
-      "med",
-      "medicine",
-    ])
-  ) {
-    return "เรื่องยาเราไม่อยากเดาแทนหมอนะ แต่เราช่วยจดคำถามนี้ให้เอาไปถามแพทย์ เภสัชกร หรือสายด่วน 1323 ได้ ถ้าต้องการ เดี๋ยวเราช่วยเรียบเรียงให้พูดง่ายขึ้น";
+  if (detectMedicationTopic(text)) {
+    return "เรื่องยาเราไม่อยากเดาแทนหมอนะ แต่ช่วยจดคำถามนี้ให้เอาไปถามแพทย์ เภสัชกร หรือสายด่วน 1323 ได้ ถ้าอยากเล่าเพิ่มว่าอาการเป็นยังไง เราจะช่วยเรียบเรียงให้พูดง่ายขึ้น";
   }
 
-  if (hasAny(normalized, ["ผู้เชี่ยวชาญ", "สายด่วน", "หมอ", "ปรึกษา"])) {
-    return `คำถามนี้เอาไปถามผู้เชี่ยวชาญได้เลยนะ ลองจดสั้น ๆ ว่า "ช่วงนี้ฉันรู้สึกแบบนี้ เกิดบ่อยแค่ไหน และกระทบการนอน/กิน/เรียนยังไง" ${HOTLINE_TEXT}`;
-  }
-
-  return "เราได้ยินนะ ขอบคุณที่เล่าให้ฟัง เล่าเพิ่มได้เลยว่าส่วนไหนของเรื่องนี้หนักกับใจที่สุด เราจะค่อย ๆ อยู่ตรงนี้กับคุณ";
+  return "เราได้ยินนะ ขอบคุณที่เล่าให้ฟัง ลองเล่าเพิ่มได้ไหมว่าส่วนไหนของเรื่องนี้หนักกับใจที่สุด เราจะค่อย ๆ อยู่ตรงนี้กับคุณ";
 }
 
-async function companionChat(req, res, next) {
+function normalizeHistory(history) {
+  if (!Array.isArray(history)) return [];
+
+  return history
+    .slice(-8)
+    .map((item) => ({
+      role: item?.role === "bot" || item?.role === "model" ? "model" : "user",
+      parts: [{ text: String(item?.text || "").slice(0, 1200) }],
+    }))
+    .filter((item) => item.parts[0].text.trim().length > 0);
+}
+
+async function callGemini({ apiKey, model, timeoutMs, message, history, topic }) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
   try {
-    const {
-      message = "",
-      history = [],
-      topic = "ชีวิตประจำวันวันนี้",
-    } = req.body;
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    if (detectRedFlag(message)) {
-      return res.json(safetyInterceptionReply());
-    }
-
-    if (!apiKey) {
-      return res.json({
-        provider: "fallback",
-        message: fallbackReply(message),
-      });
-    }
-
     const contents = [
       {
         role: "user",
@@ -103,18 +126,17 @@ If you ask a follow-up, make it feel like a friend noticing daily life, not a cl
           },
         ],
       },
-      ...history.slice(-8).map((item) => ({
-        role: item.role === "bot" ? "model" : "user",
-        parts: [{ text: String(item.text ?? "") }],
-      })),
+      ...normalizeHistory(history),
       {
         role: "user",
-        parts: [{ text: String(message) }],
+        parts: [{ text: String(message).slice(0, 2000) }],
       },
     ];
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+        model,
+      )}:generateContent?key=${encodeURIComponent(apiKey)}`,
       {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -122,26 +144,83 @@ If you ask a follow-up, make it feel like a friend noticing daily life, not a cl
           contents,
           generationConfig: {
             temperature: 0.55,
+            topP: 0.9,
             maxOutputTokens: 180,
           },
+          safetySettings: [
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
+          ],
         }),
+        signal: controller.signal,
       },
     );
 
     if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      const error = new Error(`Gemini request failed (${response.status})`);
+      error.detail = body.slice(0, 300);
+      throw error;
+    }
+
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text || "")
+      .join("\n")
+      .trim();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function companionChat(req, res, next) {
+  try {
+    const {
+      message = "",
+      history = [],
+      topic = "ชีวิตประจำวันวันนี้",
+    } = req.body;
+
+    if (detectRedFlag(message)) {
+      return res.json(safetyInterceptionReply());
+    }
+
+    const config = getGeminiConfig();
+    if (!config.configured) {
       return res.json({
         provider: "fallback",
+        geminiConfigured: false,
         message: fallbackReply(message),
       });
     }
 
-    const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    try {
+      const aiText = await callGemini({
+        apiKey: config.apiKey,
+        model: config.model,
+        timeoutMs: config.timeoutMs,
+        message,
+        history,
+        topic,
+      });
 
-    return res.json({
-      provider: "gemini",
-      message: text || fallbackReply(message),
-    });
+      return res.json({
+        provider: "gemini",
+        model: config.model,
+        geminiConfigured: true,
+        message: aiText || fallbackReply(message),
+      });
+    } catch (error) {
+      console.warn("Gemini fallback:", error.message, error.detail || "");
+      return res.json({
+        provider: "fallback",
+        geminiConfigured: true,
+        fallbackReason: error.name === "AbortError" ? "timeout" : "provider_error",
+        message: fallbackReply(message),
+      });
+    }
   } catch (error) {
     return next(error);
   }
@@ -149,4 +228,7 @@ If you ask a follow-up, make it feel like a friend noticing daily life, not a cl
 
 module.exports = {
   companionChat,
+  detectRedFlag,
+  fallbackReply,
+  getGeminiConfig,
 };

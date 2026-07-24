@@ -3,6 +3,7 @@ const test = require("node:test");
 const mongoose = require("mongoose");
 const request = require("supertest");
 const { MongoMemoryServer } = require("mongodb-memory-server");
+const User = require("../src/models/User");
 
 process.env.JWT_SECRET =
   process.env.JWT_SECRET || "test-secret-that-is-long-enough-for-rejoy-jwt";
@@ -24,7 +25,7 @@ test.after(async () => {
   await mongo.stop();
 });
 
-async function register(email) {
+async function register(email, overrides = {}) {
   const response = await request(app)
     .post("/api/auth/register")
     .send({
@@ -33,6 +34,7 @@ async function register(email) {
       firstName: email.split("@")[0],
       surname: "Tester",
       age: 18,
+      ...overrides,
     })
     .expect(201);
 
@@ -58,6 +60,67 @@ test("auth supports refresh token rotation", async () => {
     .post("/api/auth/refresh")
     .send({ refreshToken: auth.refreshToken })
     .expect(401);
+});
+
+test("doctor dashboard only includes assigned patients", async () => {
+  const doctor = await register("doctor-scope@example.com", { role: "doctor" });
+  const assignedPatient = await register("assigned-patient@example.com");
+  const otherPatient = await register("other-patient@example.com");
+
+  await User.findByIdAndUpdate(assignedPatient.user._id, {
+    $push: { assignedClinicianIds: doctor.user._id },
+  });
+
+  await request(app)
+    .post("/api/reports")
+    .set("Authorization", `Bearer ${assignedPatient.token}`)
+    .send({
+      dailyMood: "watch",
+      phq9Score: 16,
+      cbtCompletionRate: "2/5",
+    })
+    .expect(201);
+
+  await request(app)
+    .post("/api/reports")
+    .set("Authorization", `Bearer ${otherPatient.token}`)
+    .send({
+      dailyMood: "urgent",
+      phq9Score: 24,
+      cbtCompletionRate: "0/5",
+      isSosTriggered: true,
+    })
+    .expect(201);
+
+  const dashboard = await request(app)
+    .get("/api/clinical/dashboard")
+    .set("Authorization", `Bearer ${doctor.token}`)
+    .expect(200);
+
+  assert.equal(dashboard.body.scope, "hospital");
+  assert.equal(dashboard.body.totals.patients, 1);
+  assert.equal(
+    dashboard.body.patients[0].userId.toString(),
+    assignedPatient.user._id.toString(),
+  );
+
+  await request(app)
+    .post("/api/clinical/care-plans")
+    .set("Authorization", `Bearer ${doctor.token}`)
+    .send({
+      userId: assignedPatient.user._id,
+      title: "Assigned patient plan",
+    })
+    .expect(201);
+
+  await request(app)
+    .post("/api/clinical/care-plans")
+    .set("Authorization", `Bearer ${doctor.token}`)
+    .send({
+      userId: otherPatient.user._id,
+      title: "Should not be allowed",
+    })
+    .expect(403);
 });
 
 test("users cannot read or mutate another user report", async () => {
@@ -201,6 +264,42 @@ test("deep health is hidden in production without health key", async () => {
     delete process.env.HEALTH_CHECK_KEY;
   } else {
     process.env.HEALTH_CHECK_KEY = originalHealthKey;
+  }
+});
+
+test("companion chat requires auth and safely falls back without Gemini key", async () => {
+  const auth = await register("chat-owner@example.com");
+  const originalGeminiKey = process.env.GEMINI_API_KEY;
+  process.env.GEMINI_API_KEY = "demo-no-gemini";
+
+  await request(app)
+    .post("/api/chat/companion")
+    .send({ message: "วันนี้เหนื่อยนิดหน่อย" })
+    .expect(401);
+
+  const fallback = await request(app)
+    .post("/api/chat/companion")
+    .set("Authorization", `Bearer ${auth.token}`)
+    .send({ message: "วันนี้เหนื่อยนิดหน่อย" })
+    .expect(200);
+
+  assert.equal(fallback.body.provider, "fallback");
+  assert.equal(fallback.body.geminiConfigured, false);
+  assert.ok(fallback.body.message);
+
+  const safety = await request(app)
+    .post("/api/chat/companion")
+    .set("Authorization", `Bearer ${auth.token}`)
+    .send({ message: "ไม่อยากอยู่แล้ว" })
+    .expect(200);
+
+  assert.equal(safety.body.provider, "safety-intercept");
+  assert.equal(safety.body.blockedAi, true);
+
+  if (originalGeminiKey === undefined) {
+    delete process.env.GEMINI_API_KEY;
+  } else {
+    process.env.GEMINI_API_KEY = originalGeminiKey;
   }
 });
 
