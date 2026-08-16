@@ -1,5 +1,9 @@
 const express = require("express");
-const { getDeepHealth, getHealth } = require("../controllers/healthController");
+const {
+  getDeepHealth,
+  getHealth,
+  getReadiness,
+} = require("../controllers/healthController");
 
 const router = express.Router();
 
@@ -18,6 +22,7 @@ function requireDeepHealthAccess(req, res, next) {
 }
 
 router.get("/", getHealth);
+router.get("/ready", getReadiness);
 router.get("/deep", requireDeepHealthAccess, getDeepHealth);
 
 module.exports = router;

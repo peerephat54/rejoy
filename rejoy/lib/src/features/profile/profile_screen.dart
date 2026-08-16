@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/api_config.dart';
 import '../../core/auth_session.dart';
@@ -296,6 +297,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               final data = snapshot.data!;
               final summary = _ClinicalSummary.fromReports(data.reports);
+              final isClinician = data.user.isClinician;
 
               return ListView(
                 padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
@@ -342,8 +344,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     user: data.user,
                     onEdit: () => _openEditSoulProfile(data.user),
                   ),
-                  const SizedBox(height: 14),
-                  _ClinicalSnapshotCard(summary: summary),
+                  if (isClinician) ...[
+                    const SizedBox(height: 14),
+                    _ClinicalSnapshotCard(summary: summary),
+                  ],
                   const SizedBox(height: 14),
                   _ExplainableScoringCard(
                     explanation: _explainableScoring.explain(
@@ -358,10 +362,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _TrendChartCard(reports: data.reports),
                   const SizedBox(height: 14),
                   _MatrixCard(summary: summary),
-                  const SizedBox(height: 14),
-                  const _AuditLogCard(),
-                  const SizedBox(height: 14),
-                  const _TelemetryCard(),
+                  if (isClinician) ...[
+                    const SizedBox(height: 14),
+                    const _AuditLogCard(),
+                    const SizedBox(height: 14),
+                    const _TelemetryCard(),
+                  ],
                   const SizedBox(height: 14),
                   const _ClinicalDisclaimerCard(),
                 ],
@@ -990,6 +996,14 @@ class _HospitalPatientRow extends StatelessWidget {
   }
 }
 
+Future<void> _copyPatientCode(BuildContext context, String patientCode) async {
+  await Clipboard.setData(ClipboardData(text: patientCode));
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(content: Text('คัดลอกรหัสคนไข้ $patientCode แล้ว')));
+}
+
 class _HeroCard extends StatelessWidget {
   const _HeroCard({
     required this.user,
@@ -1053,6 +1067,43 @@ class _HeroCard extends StatelessWidget {
                     Text(
                       '${user.fullName} • อายุ ${user.age} ปี • $reportCount report(s)',
                       style: const TextStyle(color: Color(0xFF547077)),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.76),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: const Color(0xFF72B8AD).withValues(alpha: 0.5),
+                        ),
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(999),
+                        onTap: () =>
+                            _copyPatientCode(context, user.patientCode),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.badge_rounded,
+                              size: 16,
+                              color: Color(0xFF5BA99E),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'รหัสให้หมอแอด: ${user.patientCode}',
+                              style: const TextStyle(
+                                color: Color(0xFF17343C),
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -1144,6 +1195,7 @@ class _SoulProfileCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
+          _InfoRow(label: 'รหัสคนไข้สำหรับหมอแอด', value: user.patientCode),
           _InfoRow(label: 'ชื่อ', value: user.fullName),
           _InfoRow(label: 'อายุ', value: '${user.age} ปี'),
           _InfoRow(label: 'ยา/อาหารที่แพ้', value: _joinOrDash(user.allergies)),

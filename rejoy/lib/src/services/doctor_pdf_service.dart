@@ -48,14 +48,19 @@ class DoctorPdfService {
           pw.SizedBox(height: 10),
           _medicalBackground(user),
           pw.SizedBox(height: 10),
+          _pageGuard(170),
           _clinicalQuestions(periodReports),
           pw.SizedBox(height: 10),
+          _pageGuard(190),
           _trendTable(periodReports),
           pw.SizedBox(height: 10),
+          _pageGuard(130),
           _matrixSummary(matrixAverage),
           pw.SizedBox(height: 10),
+          _pageGuard(160),
           _treatmentPrompts(user, periodReports),
           pw.SizedBox(height: 10),
+          _pageGuard(260),
           _diaryNotes(periodReports),
           pw.SizedBox(height: 10),
           _safetyNote(),
@@ -88,21 +93,26 @@ class DoctorPdfService {
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
         pw.Text(
-          'ReJoy Clinical Summary Report',
+          'รายงานสรุปสุขภาพใจ ReJoy',
           style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold),
         ),
         pw.SizedBox(height: 4),
         pw.Text(
-          'Pre-visit handoff for clinician review. Data comes from patient-entered app logs and must be verified in consultation.',
+          'Clinical Summary Report | สรุปก่อนพบแพทย์จากข้อมูลที่ผู้ใช้บันทึกในแอป และควรยืนยันซ้ำระหว่างการพูดคุย',
           style: const pw.TextStyle(fontSize: 10),
         ),
         pw.SizedBox(height: 8),
+        _demoBadge(),
+        pw.SizedBox(height: 8),
         _keyValueTable([
-          ['Patient', user.fullName.isEmpty ? user.email : user.fullName],
-          ['Latest log', _formatDate(latestDate)],
           [
-            'Report window',
-            '${reports.length} log(s), latest 14 days if available',
+            'ผู้ใช้ / Patient',
+            user.fullName.isEmpty ? user.email : user.fullName,
+          ],
+          ['บันทึกล่าสุด / Latest log', _formatDate(latestDate)],
+          [
+            'ช่วงข้อมูล / Report window',
+            '${reports.length} รายการล่าสุดในช่วง 14 วันเท่าที่มีข้อมูล',
           ],
         ]),
         pw.SizedBox(height: 8),
@@ -121,29 +131,31 @@ class DoctorPdfService {
   }) {
     final urgent = latest.phq9Score >= 20 || sosFlags > 0;
     return _section(
-      urgent ? 'Doctor Quick Read - priority review' : 'Doctor Quick Read',
+      urgent
+          ? 'สรุปด่วนสำหรับแพทย์: ควรทบทวนก่อนพบผู้ใช้'
+          : 'สรุปด่วนสำหรับแพทย์',
       subtitle:
-          '60-second summary. Use this to decide what to ask first, not as an automated diagnosis.',
+          'อ่านภายใน 60 วินาทีเพื่อจัดลำดับคำถามก่อนคุย ไม่ใช่การวินิจฉัยอัตโนมัติ',
       children: [
         _keyValueTable([
           [
-            'Latest PHQ-9',
+            'PHQ-9 ล่าสุด',
             '${latest.phq9Score}/27 | ${_phq9Band(latest.phq9Score)}',
           ],
-          ['Change vs prior log', _formatDelta(phqDelta)],
-          ['Average PHQ-9', avgPhq9.toStringAsFixed(1)],
+          ['เปลี่ยนจากครั้งก่อน', _formatDelta(phqDelta)],
+          ['ค่าเฉลี่ย PHQ-9', avgPhq9.toStringAsFixed(1)],
           [
-            'Latest mood label',
-            latest.dailyMood.isEmpty ? '-' : latest.dailyMood,
+            'อารมณ์ล่าสุด',
+            latest.dailyMood.isEmpty ? '-' : _cleanDemoText(latest.dailyMood),
           ],
-          ['CBT participation avg.', '${avgCbt.toStringAsFixed(0)}%'],
-          ['Rest / recovery days', '$restDays day(s)'],
-          ['SOS flags', '$sosFlags time(s)'],
+          ['ความร่วมมือ CBT เฉลี่ย', '${avgCbt.toStringAsFixed(0)}%'],
+          ['วันพัก/ฟื้นตัว', '$restDays วัน'],
+          ['การกด SOS', '$sosFlags ครั้ง'],
           [
-            'First clinical check',
+            'ควรถามก่อนเป็นอันดับแรก',
             urgent
-                ? 'Start with safety plan, self-harm thoughts, support person, and crisis resources.'
-                : 'Confirm mood, sleep, appetite, energy, functioning, medication adherence, and side effects.',
+                ? 'เริ่มจากความปลอดภัยวันนี้ แผนรับมือ ความคิดทำร้ายตัวเอง ผู้ช่วยเหลือใกล้ตัว และช่องทางช่วยเหลือฉุกเฉิน'
+                : 'ยืนยันเรื่องอารมณ์ การนอน ความอยากอาหาร พลังงาน การใช้ชีวิต การกินยา และผลข้างเคียง',
           ],
         ]),
       ],
@@ -152,19 +164,21 @@ class DoctorPdfService {
 
   pw.Widget _medicalBackground(BackendUser user) {
     return _section(
-      '1. Medical background to verify',
+      '1. ข้อมูลพื้นฐานทางการแพทย์ที่ควรยืนยัน',
       subtitle:
-          'Basic information that should be confirmed directly with the patient.',
+          'ข้อมูลนี้ช่วยเตรียมคำถามก่อนพบผู้ใช้ และควรยืนยันกับผู้ใช้โดยตรง',
       children: [
         _keyValueTable([
-          ['Age', user.age == 0 ? '-' : '${user.age}'],
-          ['Allergies', _joinOrDash(user.allergies)],
-          ['Current medications', _joinOrDash(user.currentMedications)],
+          ['อายุ', user.age == 0 ? '-' : '${user.age}'],
+          ['ประวัติแพ้ยา/อาหาร', _joinOrDash(user.allergies)],
+          ['ยาที่ใช้อยู่', _joinOrDash(user.currentMedications)],
           [
-            'Medical history',
-            user.medicalHistory.isEmpty ? '-' : user.medicalHistory,
+            'ประวัติการรักษา',
+            user.medicalHistory.isEmpty
+                ? '-'
+                : _cleanDemoText(user.medicalHistory),
           ],
-          ['Emergency contacts', _joinOrDash(user.emergencyContactNumbers)],
+          ['เบอร์ติดต่อฉุกเฉิน', _joinOrDash(user.emergencyContactNumbers)],
         ]),
       ],
     );
@@ -182,28 +196,33 @@ class DoctorPdfService {
         .length;
 
     return _section(
-      '2. Clinical flags to ask today',
-      subtitle:
-          'Question prompts designed to save time and reduce recall bias.',
+      '2. ประเด็นสำคัญที่ควรถามวันนี้',
+      subtitle: 'ช่วยให้แพทย์ถามตรงจุด ลดการพึ่งความจำย้อนหลังของผู้ใช้',
       children: [
         _keyValueTable([
           [
-            'Safety / SOS',
+            'ความปลอดภัย / SOS',
             sosDays > 0
-                ? '$sosDays SOS flag(s). Ask about current safety, plan, intent, means, and support.'
-                : 'No SOS flag in this report window.',
+                ? 'พบการกด SOS $sosDays ครั้ง ควรถามเรื่องความปลอดภัยวันนี้ แผนรับมือ ความตั้งใจ วิธีที่เข้าถึงได้ และคนช่วยเหลือ'
+                : 'ไม่พบ SOS ในช่วงรายงานนี้',
           ],
           [
-            'PHQ-9 elevation',
-            '$highPhqDays day(s) >= 15, $severeDays day(s) >= 20. Verify severity and PHQ-9 item 9.',
+            'PHQ-9 สูงต่อเนื่อง',
+            '$highPhqDays วันอยู่ระดับ >=15 และ $severeDays วันอยู่ระดับ >=20 ควรยืนยันความรุนแรงกับผู้ใช้',
           ],
           [
-            'Function / activity',
-            '$lowCbtDays low-activity day(s). Ask about school/home functioning, withdrawal, and barriers.',
+            'PHQ-9 ข้อ 9 / ความปลอดภัย',
+            (sosDays > 0 || severeDays > 0)
+                ? 'ควรถามแยกอย่างอ่อนโยนเรื่องความคิดทำร้ายตัวเองหรือไม่อยากมีชีวิตอยู่ แม้ระบบยังไม่มีคะแนนข้อ 9 แยก'
+                : 'ยังไม่มีสัญญาณข้อ 9 แยกในรายงานนี้ แต่ควรถามตามดุลยพินิจแพทย์',
           ],
           [
-            'Recovery days',
-            '${reports.where((item) => item.isRestDay).length} rest day(s). Confirm whether rest was protective or avoidance.',
+            'การใช้ชีวิต / กิจกรรม',
+            '$lowCbtDays วันมีการทำกิจกรรมต่ำ ควรถามเรื่องเรียน/บ้าน การแยกตัว และอุปสรรคในการเริ่มกิจกรรม',
+          ],
+          [
+            'วันพักฟื้น',
+            '${reports.where((item) => item.isRestDay).length} วัน ควรถามว่าการพักช่วยให้ปลอดภัยขึ้น หรือเป็นการหลีกเลี่ยงกิจกรรม',
           ],
         ]),
       ],
@@ -220,24 +239,26 @@ class DoctorPdfService {
         _formatDateShort(item.date),
         '${item.phq9Score}',
         '${_parseCbtRate(item.cbtCompletionRate).round()}%',
-        item.dailyMood.isEmpty ? '-' : item.dailyMood,
+        item.dailyMood.isEmpty ? '-' : _cleanDemoText(item.dailyMood),
         markers.isEmpty ? '-' : markers,
       ];
     }).toList();
 
     return _section(
-      '3. Trend summary',
+      '3. สรุปแนวโน้มล่าสุด',
       subtitle:
-          'Latest logs first. PHQ-9 uses 0-27 scale; CBT uses completion percentage.',
+          'Latest logs first. PHQ-9 = 0-27 คะแนน, CBT = สัดส่วนภารกิจที่ทำสำเร็จ',
       children: [
+        _trendOneLine(reports),
+        pw.SizedBox(height: 6),
         if (rows.isEmpty)
           pw.Text(
-            'No trend data available.',
+            'ยังไม่มีข้อมูลแนวโน้ม',
             style: const pw.TextStyle(fontSize: 10.5),
           )
         else
           _dataTable(
-            headers: ['Date', 'PHQ-9', 'CBT', 'Mood label', 'Marker'],
+            headers: ['วันที่', 'PHQ-9', 'CBT', 'อารมณ์', 'หมายเหตุ'],
             rows: rows,
             widths: const {
               0: pw.FixedColumnWidth(54),
@@ -253,22 +274,21 @@ class DoctorPdfService {
 
   pw.Widget _matrixSummary(ReportSymptomMatrix matrix) {
     return _section(
-      '4. Symptom matrix',
-      subtitle:
-          'Mood, somatic, and behavioral signals from app logs. Use as interview prompts.',
+      '4. Symptom Matrix: Mood / Somatic / Behavioral',
+      subtitle: 'สรุปสัญญาณ 3 แกนเพื่อใช้เป็นคำถามนำ ไม่ใช่ผลวินิจฉัย',
       children: [
         _keyValueTable([
           [
-            'Mood axis',
-            '${matrix.moodScore} | ask hopelessness, guilt, concentration, irritability.',
+            'Mood axis / อารมณ์',
+            '${matrix.moodScore} | ถามเรื่องความสิ้นหวัง ความรู้สึกผิด สมาธิ และความหงุดหงิด',
           ],
           [
-            'Somatic axis',
-            '${matrix.somaticScore} | ask sleep, appetite, fatigue, psychomotor change.',
+            'Somatic axis / อาการทางกาย',
+            '${matrix.somaticScore} | ถามเรื่องการนอน ความอยากอาหาร ความเหนื่อยล้า และการเคลื่อนไหวช้าลง/กระสับกระส่าย',
           ],
           [
-            'Behavioral axis',
-            '${matrix.behavioralScore} | ask withdrawal, daily routine, school/home function.',
+            'Behavioral axis / พฤติกรรม',
+            '${matrix.behavioralScore} | ถามเรื่องการแยกตัว กิจวัตรประจำวัน และการใช้ชีวิตที่บ้าน/โรงเรียน',
           ],
         ]),
       ],
@@ -276,38 +296,23 @@ class DoctorPdfService {
   }
 
   pw.Widget _treatmentPrompts(BackendUser user, List<ReportEntry> reports) {
-    final latest = reports.isEmpty ? null : reports.first;
     final avgCbt = _averageCbtRate(reports);
     return _section(
-      '5. Medication & treatment discussion prompts',
-      subtitle:
-          'Useful questions before medication discussion or care-plan adjustment.',
+      '5. คำถามประกอบการประเมินและปรับแผนดูแล',
+      subtitle: 'ใช้เตรียมข้อมูลก่อนแพทย์ประเมิน ไม่ใช่คำสั่งจ่ายยาอัตโนมัติ',
       children: [
         _keyValueTable([
+          ['ยาที่ควรยืนยัน', _joinOrDash(user.currentMedications)],
+          ['ประวัติแพ้ที่ควรถามซ้ำ', _joinOrDash(user.allergies)],
           [
-            'Current medications to confirm',
-            _joinOrDash(user.currentMedications),
-          ],
-          ['Allergy check', _joinOrDash(user.allergies)],
-          [
-            'Adherence / side effects',
-            'Ask whether missed doses, sedation, nausea, sleep change, appetite change, or agitation affected routine.',
+            'การกินยา / ผลข้างเคียง',
+            'ถามเรื่องลืมกินยา ง่วงซึม คลื่นไส้ การนอนเปลี่ยน ความอยากอาหารเปลี่ยน หรือกระสับกระส่ายที่กระทบชีวิตประจำวัน',
           ],
           [
-            'Activity clue',
+            'เบาะแสด้านกิจกรรม',
             avgCbt < 40
-                ? 'Low CBT completion. Ask about energy, motivation, daily structure, and barriers.'
-                : 'Activity participation appears relatively consistent.',
-          ],
-          [
-            'Latest animal/rest context',
-            latest == null
-                ? '-'
-                : latest.isRestDay
-                ? 'Rest day logged'
-                : latest.unlockedAnimalToday.isEmpty
-                ? '-'
-                : latest.unlockedAnimalToday,
+                ? 'การทำภารกิจต่ำ ควรถามเรื่องพลังงาน แรงจูงใจ โครงสร้างวัน และอุปสรรค'
+                : 'การทำกิจกรรมค่อนข้างสม่ำเสมอ ควรถามว่าปัจจัยใดช่วยให้ทำได้',
           ],
         ]),
       ],
@@ -317,23 +322,28 @@ class DoctorPdfService {
   pw.Widget _diaryNotes(List<ReportEntry> reports) {
     final notes = reports
         .where((item) => item.diaryNote.trim().isNotEmpty)
-        .take(8)
-        .map((item) => [_formatDate(item.date), item.diaryNote.trim()])
+        .take(5)
+        .map(
+          (item) => [
+            _formatDate(item.date),
+            _cleanDemoText(item.diaryNote.trim()),
+          ],
+        )
         .toList();
 
     return _section(
-      '6. Diary notes / patient words',
+      '6. บันทึกจากผู้ใช้ / Diary notes',
       subtitle:
-          'Patient-entered notes are included as context. Confirm meaning directly and avoid interpreting them alone.',
+          'ข้อความนี้เป็นบริบทจากผู้ใช้ ควรถามยืนยันความหมายโดยตรง ไม่ควรตีความแทนผู้ใช้เพียงอย่างเดียว',
       children: [
         if (notes.isEmpty)
           pw.Text(
-            'No diary note submitted.',
+            'ยังไม่มีบันทึกความในใจ',
             style: const pw.TextStyle(fontSize: 10.5),
           )
         else
           _dataTable(
-            headers: ['Date', 'Patient note'],
+            headers: ['วันที่', 'ข้อความจากผู้ใช้'],
             rows: notes,
             widths: const {0: pw.FixedColumnWidth(76), 1: pw.FlexColumnWidth()},
           ),
@@ -341,17 +351,21 @@ class DoctorPdfService {
     );
   }
 
+  pw.Widget _pageGuard(double minimumFreeSpace) {
+    return pw.NewPage(freeSpace: minimumFreeSpace);
+  }
+
   pw.Widget _safetyNote() {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
         pw.Text(
-          'Important safety note',
+          'หมายเหตุด้านความปลอดภัย',
           style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
         ),
         pw.SizedBox(height: 3),
         pw.Text(
-          'ReJoy supports tracking and preparation for care. It does not diagnose, prescribe, replace clinical judgment, or provide 24/7 emergency monitoring.',
+          'ReJoy เป็นเครื่องมือช่วยติดตามและเตรียมข้อมูลประกอบการดูแล ไม่ใช่เครื่องมือวินิจฉัยโรค ไม่จ่ายยา ไม่แทนดุลยพินิจแพทย์ และไม่ใช่ระบบเฝ้าระวังฉุกเฉิน 24 ชั่วโมง หากมีภาวะวิกฤตควรติดต่อ 1323, 1669 หรือผู้เชี่ยวชาญทันที',
           style: const pw.TextStyle(fontSize: 9.5),
         ),
       ],
@@ -379,6 +393,26 @@ class DoctorPdfService {
         pw.SizedBox(height: 5),
         ...children,
       ],
+    );
+  }
+
+  pw.Widget _demoBadge() {
+    return pw.Container(
+      width: double.infinity,
+      padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: pw.BoxDecoration(
+        color: PdfColor.fromInt(0xFFFFF4E7),
+        border: pw.Border.all(color: PdfColor.fromInt(0xFFE0A23A), width: 0.8),
+        borderRadius: pw.BorderRadius.circular(8),
+      ),
+      child: pw.Text(
+        'ข้อมูลจำลองสำหรับสาธิต: ใช้แสดง workflow รายงานแพทย์ ไม่ใช่ข้อมูลผู้ป่วยจริง',
+        style: pw.TextStyle(
+          fontSize: 10,
+          fontWeight: pw.FontWeight.bold,
+          color: PdfColor.fromInt(0xFF8A4A12),
+        ),
+      ),
     );
   }
 
@@ -466,6 +500,49 @@ class DoctorPdfService {
           ),
         ),
       ],
+    );
+  }
+
+  pw.Widget _trendOneLine(List<ReportEntry> reports) {
+    if (reports.isEmpty) {
+      return pw.Text(
+        'สรุปแนวโน้ม: ยังไม่มีข้อมูลเพียงพอสำหรับสรุปแนวโน้ม',
+        style: const pw.TextStyle(fontSize: 10),
+      );
+    }
+
+    final highPhqDays = reports.where((item) => item.phq9Score >= 15).length;
+    final severeDays = reports.where((item) => item.phq9Score >= 20).length;
+    final sosDays = reports.where((item) => item.isSosTriggered).length;
+    final lowCbtDays = reports
+        .where(
+          (item) =>
+              !item.isRestDay && _parseCbtRate(item.cbtCompletionRate) < 50,
+        )
+        .length;
+
+    final parts = <String>[
+      if (severeDays > 0)
+        'PHQ-9 อยู่ระดับรุนแรง $severeDays วัน'
+      else if (highPhqDays > 0)
+        'PHQ-9 อยู่ระดับเฝ้าระวัง $highPhqDays วัน'
+      else
+        'PHQ-9 ยังไม่อยู่ระดับสูงในช่วงนี้',
+      if (lowCbtDays > 0) 'CBT ต่ำ $lowCbtDays วัน' else 'CBT ค่อนข้างสม่ำเสมอ',
+      if (sosDays > 0) 'มี SOS $sosDays ครั้ง' else 'ไม่พบ SOS',
+    ];
+
+    return pw.Container(
+      width: double.infinity,
+      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: pw.BoxDecoration(
+        color: PdfColor.fromInt(0xFFF4FBFA),
+        borderRadius: pw.BorderRadius.circular(6),
+      ),
+      child: pw.Text(
+        'สรุปแนวโน้ม ${reports.length} รายการล่าสุด: ${parts.join(', ')}',
+        style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+      ),
     );
   }
 
@@ -558,8 +635,18 @@ class DoctorPdfService {
   }
 
   String _joinOrDash(List<String> values) {
-    final cleaned = values.where((item) => item.trim().isNotEmpty).toList();
+    final cleaned = values
+        .map(_cleanDemoText)
+        .where((item) => item.trim().isNotEmpty)
+        .toList();
     return cleaned.isEmpty ? '-' : cleaned.join(', ');
+  }
+
+  String _cleanDemoText(String value) {
+    return value
+        .replaceFirst(RegExp(r'^ข้อมูลจำลองสำหรับสาธิต:\s*'), '')
+        .replaceFirst(RegExp(r'^ข้อมูลจำลอง:\s*'), '')
+        .trim();
   }
 
   String _formatDate(DateTime? date) {

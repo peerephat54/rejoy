@@ -51,7 +51,9 @@ class ApiConfig {
       return _savedBaseUrl!;
     }
 
-    if (kIsWeb) {
+    // Real builds must not depend on a developer machine.
+    // Debug keeps local endpoints so day-to-day development stays fast.
+    if (!kDebugMode || kIsWeb) {
       return _cloudBaseUrl;
     }
 

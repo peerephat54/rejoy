@@ -206,5 +206,6 @@ userSchema.index({ "moodLog.date": -1 });
 userSchema.index({ "phq9History.date": -1 });
 userSchema.index({ "symptomMatrixHistory.date": -1 });
 userSchema.index({ "cbtQuestHistory.date": -1 });
+userSchema.index({ role: 1, assignedClinicianIds: 1, updatedAt: -1 });
 
 module.exports = mongoose.model("User", userSchema);

@@ -1,6 +1,14 @@
 const User = require('../models/User');
 const { verifyAuthToken } = require('../utils/token');
 
+const AUTH_USER_FIELDS = [
+  '_id',
+  'email',
+  'role',
+  'onboardingComplete',
+  'assignedClinicianIds',
+].join(' ');
+
 async function requireAuth(req, res, next) {
   try {
     const header = req.get('authorization') || '';
@@ -11,7 +19,9 @@ async function requireAuth(req, res, next) {
     }
 
     const payload = verifyAuthToken(token);
-    const user = await User.findById(payload.sub).select('-passwordHash');
+    const user = await User.findById(payload.sub)
+      .select(AUTH_USER_FIELDS)
+      .lean();
 
     if (!user) {
       return res.status(401).json({ message: 'User no longer exists' });

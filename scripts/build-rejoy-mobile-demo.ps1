@@ -1,6 +1,5 @@
 param(
-  [Parameter(Mandatory = $true)]
-  [string]$ApiBaseUrl,
+  [string]$ApiBaseUrl = "https://rejoy-backend.onrender.com",
 
   [ValidateSet("apk", "appbundle")]
   [string]$Target = "apk"
@@ -26,6 +25,9 @@ if ($Target -eq "appbundle") {
   Write-Host "$FlutterApp\build\app\outputs\bundle\release\app-release.aab"
 } else {
   flutter build apk --release --dart-define "REJOY_API_BASE_URL=$ApiBaseUrl"
+  Copy-Item -LiteralPath "$FlutterApp\build\app\outputs\flutter-apk\app-release.apk" -Destination "$Root\ReJoy-production.apk" -Force
   Write-Host "Built release APK:" -ForegroundColor Green
   Write-Host "$FlutterApp\build\app\outputs\flutter-apk\app-release.apk"
+  Write-Host "Copied installable APK to:" -ForegroundColor Green
+  Write-Host "$Root\ReJoy-production.apk"
 }

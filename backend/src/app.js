@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const hpp = require('hpp');
 const morgan = require('morgan');
+const { randomUUID } = require('crypto');
 
 const authRoutes = require('./routes/authRoutes');
 const healthRoutes = require('./routes/healthRoutes');
@@ -32,6 +33,13 @@ function cacheFor(seconds) {
 
 app.set('etag', 'weak');
 app.set('trust proxy', 1);
+
+app.use((req, res, next) => {
+  const requestId = req.get('x-request-id') || randomUUID();
+  req.requestId = requestId;
+  res.set('x-request-id', requestId);
+  next();
+});
 
 const allowedOrigins = (process.env.CORS_ORIGIN || '*')
   .split(',')
@@ -69,7 +77,11 @@ app.use(express.json({ limit: '250kb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(mongoSanitize());
 app.use(hpp());
-app.use(morgan('dev'));
+app.use(
+  morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev', {
+    skip: (req) => req.path === '/api/health' || req.path === '/api/health/ready',
+  }),
+);
 
 app.get('/', (req, res) => {
   res.json({

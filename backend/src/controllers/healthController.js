@@ -14,6 +14,16 @@ function getHealth(req, res) {
   });
 }
 
+function getReadiness(req, res) {
+  const dbReady = mongoose.connection.readyState === 1;
+  return res.status(dbReady ? 200 : 503).json({
+    status: dbReady ? "ready" : "not-ready",
+    service: "rejoy-backend",
+    database: dbReady ? "connected" : "disconnected",
+    timestamp: new Date().toISOString(),
+  });
+}
+
 async function getDeepHealth(req, res, next) {
   try {
     const dbReady = mongoose.connection.readyState === 1;
@@ -43,4 +53,4 @@ async function getDeepHealth(req, res, next) {
   }
 }
 
-module.exports = { getDeepHealth, getHealth };
+module.exports = { getDeepHealth, getHealth, getReadiness };

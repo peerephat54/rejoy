@@ -8,6 +8,13 @@ import '../../services/local_sync_service.dart';
 import '../../services/rejoy_api_client.dart';
 import '../../widgets/rejoy_loading.dart';
 
+const _missionSkyTop = Color(0xFFE2FBFF);
+const _missionSkyMid = Color(0xFFDFF7F1);
+const _missionGreenGlow = Color(0xFFEAF4C5);
+const _missionSandGlow = Color(0xFFFFF1D1);
+const _missionInk = Color(0xFF17343C);
+const _missionMutedInk = Color(0xFF5D757B);
+
 String _gentleEnergyLabel(String energyLevel) {
   switch (energyLevel) {
     case 'rest':
@@ -122,6 +129,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
       );
 
       final user = profile.user;
+      widget.session.mergeUnlockedAnimals(user.unlockedAnimals);
       final available = quests.where((quest) {
         return !_selectedQuests.any((selected) => selected.id == quest.id) &&
             !_skippedQuestIds.contains(quest.id);
@@ -378,23 +386,28 @@ class _MissionsScreenState extends State<MissionsScreen> {
   Future<void> _openMemoryPaper() async {
     final controller = TextEditingController(text: _memoryNote ?? '');
     final reframePrompt = _compassionateSystem.nightPrompt(widget.session.mood);
+    String? noteToSave;
 
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.78,
-          minChildSize: 0.55,
-          maxChildSize: 0.92,
-          builder: (context, scrollController) {
-            return Container(
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: Colors.transparent,
+        builder: (sheetContext) {
+          return FractionallySizedBox(
+            heightFactor: 0.86,
+            alignment: Alignment.bottomCenter,
+            child: Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Color(0xFFF9F0D8), Color(0xFFE8F2EA)],
+                  colors: [
+                    _missionSkyTop,
+                    Color(0xFFEAF8EE),
+                    Color(0xFFFFF2D3),
+                  ],
                 ),
                 borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
               ),
@@ -429,7 +442,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
                             ),
                           ),
                           IconButton(
-                            onPressed: () => Navigator.pop(context),
+                            onPressed: () => Navigator.of(sheetContext).pop(),
                             icon: const Icon(Icons.close),
                           ),
                         ],
@@ -438,9 +451,18 @@ class _MissionsScreenState extends State<MissionsScreen> {
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFFF8E4),
+                          color: Colors.white.withValues(alpha: 0.82),
                           borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: const Color(0xFFE7D59B)),
+                          border: Border.all(color: const Color(0xFFCBE4DB)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(
+                                0xFF7BC8BE,
+                              ).withValues(alpha: 0.12),
+                              blurRadius: 14,
+                              offset: const Offset(0, 7),
+                            ),
+                          ],
                         ),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -474,9 +496,19 @@ class _MissionsScreenState extends State<MissionsScreen> {
                       FilledButton.icon(
                         onPressed: () async {
                           final note = controller.text.trim();
-                          await _saveMemoryNote(note);
-                          if (context.mounted && note.isNotEmpty) {
-                            Navigator.pop(context);
+                          if (note.isEmpty) {
+                            ScaffoldMessenger.of(sheetContext).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'เขียนความในใจก่อนบันทึกนิดนึงนะ',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+                          noteToSave = note;
+                          if (sheetContext.mounted) {
+                            Navigator.of(sheetContext).pop();
                           }
                         },
                         icon: const Icon(Icons.save_outlined),
@@ -491,13 +523,16 @@ class _MissionsScreenState extends State<MissionsScreen> {
                   ),
                 ),
               ),
-            );
-          },
-        );
-      },
-    );
+            ),
+          );
+        },
+      );
+    } finally {
+      controller.dispose();
+    }
 
-    controller.dispose();
+    if (!mounted || noteToSave == null) return;
+    await _saveMemoryNote(noteToSave!);
   }
 
   EnergyLevel? _energyFromLabel(String energyLevel) {
@@ -528,6 +563,14 @@ class _MissionsScreenState extends State<MissionsScreen> {
   }
 
   void _skipQuest(QuestItem quest) {
+    if (quest.isDoctorRecommended) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('เควสนี้หมอแนะนำให้ทำ จึงเก็บไว้ในกองเควสของวันนี้นะ'),
+        ),
+      );
+      return;
+    }
     setState(() {
       _skippedQuestIds.add(quest.id);
       _availableQuests.removeWhere((item) => item.id == quest.id);
@@ -537,6 +580,14 @@ class _MissionsScreenState extends State<MissionsScreen> {
   }
 
   void _removeSelectedQuest(QuestItem quest) {
+    if (quest.isDoctorRecommended) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('เควสนี้หมอแนะนำให้ทำ จึงยังอยู่ในช่องเควสของวันนี้นะ'),
+        ),
+      );
+      return;
+    }
     setState(() {
       _selectedQuests.removeWhere((item) => item.id == quest.id);
       _completedQuestIds.remove(quest.id);
@@ -557,6 +608,61 @@ class _MissionsScreenState extends State<MissionsScreen> {
         _completedQuestIds.remove(quest.id);
       }
     });
+  }
+
+  Set<String> _knownAnimalFamilies({Iterable<String> extra = const []}) {
+    final ids = <String>[
+      ...widget.session.unlockedAnimals,
+      ...?_currentUser?.unlockedAnimals,
+      ...extra,
+    ];
+    return ids.map(_animalFamily).where((family) => family.isNotEmpty).toSet();
+  }
+
+  String _animalFamily(String animalId) {
+    final normalized = animalId.trim().toLowerCase();
+    if (normalized.isEmpty) return '';
+    final dashIndex = normalized.lastIndexOf('-');
+    if (dashIndex > 0 &&
+        int.tryParse(normalized.substring(dashIndex + 1)) != null) {
+      return normalized.substring(0, dashIndex);
+    }
+    return normalized
+        .replaceFirst('doctor-', '')
+        .replaceAll(RegExp(r'[^a-z]'), '');
+  }
+
+  List<String> _newAnimalsSince(
+    Set<String> knownFamilies,
+    Iterable<String> ids,
+  ) {
+    final newAnimals = <String>[];
+    final seenFamilies = {...knownFamilies};
+    for (final id in ids) {
+      final trimmed = id.trim();
+      final family = _animalFamily(trimmed);
+      if (trimmed.isEmpty || family.isEmpty || seenFamilies.contains(family)) {
+        continue;
+      }
+      seenFamilies.add(family);
+      newAnimals.add(trimmed);
+    }
+    return newAnimals;
+  }
+
+  List<String> _fallbackUnlockedAnimals(Set<String> knownFamilies) {
+    if (_isRestDay || _completedQuestIds.length < 3) return const <String>[];
+    final seenFamilies = {...knownFamilies};
+    for (final quest in _selectedQuests) {
+      if (!_completedQuestIds.contains(quest.id)) continue;
+      final animalId = quest.animalId.trim();
+      final family = _animalFamily(animalId);
+      if (animalId.isEmpty || family.isEmpty || seenFamilies.contains(family)) {
+        continue;
+      }
+      return <String>[animalId];
+    }
+    return const <String>[];
   }
 
   bool get _canFinishDay => _isRestDay || _completedQuestIds.length >= 3;
@@ -610,6 +716,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
       'energyModeSelected': user.currentEnergyLevel,
       'isRestDay': _isRestDay,
     };
+    final knownFamiliesBeforeFinish = _knownAnimalFamilies();
 
     try {
       final result = await _client.finishQuestDayForUser(
@@ -622,10 +729,28 @@ class _MissionsScreenState extends State<MissionsScreen> {
         energyModeSelected: user.currentEnergyLevel,
         isRestDay: _isRestDay,
       );
+      final updatedUserAnimals =
+          result.user?.unlockedAnimals ?? const <String>[];
+      final serverNewAnimals = _newAnimalsSince(
+        knownFamiliesBeforeFinish,
+        <String>[...result.unlockedAnimalsToday, ...updatedUserAnimals],
+      );
+      final localFallbackAnimals = serverNewAnimals.isEmpty
+          ? _fallbackUnlockedAnimals(knownFamiliesBeforeFinish)
+          : const <String>[];
+      final encounterAnimals = <String>[
+        ...serverNewAnimals,
+        ...localFallbackAnimals,
+      ];
+
+      widget.session.mergeUnlockedAnimals(result.unlockedAnimalsToday);
+      widget.session.mergeUnlockedAnimals(updatedUserAnimals);
+      widget.session.mergeUnlockedAnimals(localFallbackAnimals);
+      ReJoyApiClient.clearCache();
 
       if (!mounted) return;
       final compassionateMessage = _compassionateSystem.encounterCopy(
-        newAnimals: result.unlockedAnimalsToday,
+        newAnimals: encounterAnimals,
         completedQuests: completedQuests.length,
         backendMessage: result.companionMessage.isNotEmpty
             ? result.companionMessage
@@ -634,6 +759,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
       setState(() {
         _statusMessage = compassionateMessage;
         _isRestDay = false;
+        _currentUser = result.user ?? _currentUser;
       });
       widget.session.addJournal(
         'จบวัน: $compassionateMessage',
@@ -656,6 +782,11 @@ class _MissionsScreenState extends State<MissionsScreen> {
         userId: user.id,
         payload: finishPayload,
       );
+      final localFallbackAnimals = _fallbackUnlockedAnimals(
+        knownFamiliesBeforeFinish,
+      );
+      widget.session.mergeUnlockedAnimals(localFallbackAnimals);
+      ReJoyApiClient.clearCache();
       if (!mounted) return;
       setState(() {
         _statusMessage =
@@ -748,74 +879,270 @@ class _MissionsScreenState extends State<MissionsScreen> {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFFE9F6F5), Color(0xFFF8F7F0)],
+          stops: [0, 0.48, 0.78, 1],
+          colors: [
+            _missionSkyTop,
+            _missionSkyMid,
+            _missionGreenGlow,
+            _missionSandGlow,
+          ],
         ),
       ),
       child: SafeArea(
-        child: RefreshIndicator(
-          color: const Color(0xFF59A8A1),
-          onRefresh: () => _loadBoard(forceRefresh: true),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
-            physics: const AlwaysScrollableScrollPhysics(),
-            children: [
-              _MissionsHero(
-                user: _currentUser,
-                selectedCount: selectedCount,
-                completedCount: completedCount,
+        child: Stack(
+          children: [
+            const Positioned(
+              left: -28,
+              top: 128,
+              child: _MissionCloudDecoration(
+                width: 142,
+                height: 86,
+                opacity: 0.26,
               ),
-              const SizedBox(height: 12),
-              Text(
-                'ลากการ์ดบนสุดไปทางขวาเพื่อเก็บเควส หรือซ้ายเพื่อข้าม',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFF667A85),
-                ),
+            ),
+            const Positioned(
+              right: -24,
+              top: 54,
+              child: _MissionCloudDecoration(
+                width: 118,
+                height: 72,
+                opacity: 0.24,
               ),
-              const SizedBox(height: 12),
-              if (_statusMessage != null) ...[
-                const SizedBox(height: 12),
-                _StatusPill(message: _statusMessage!),
-              ],
-              const SizedBox(height: 16),
-              _CombinedDailyBoard(
-                mood: widget.session.mood,
-                energy: widget.session.energy,
-                filterLabels: filterLabels,
-                energyLevelFilter: _energyLevelFilter,
-                onFilterSelected: _setFilter,
-                isRestDay: _isRestDay,
-                onRestDayChanged: _setRestDay,
-                onReload: _loadBoard,
-                loading: _loading,
-                errorMessage: _errorMessage,
-                availableQuests: _availableQuests,
-                onAcceptQuest: _selectQuest,
-                onSkipQuest: _skipQuest,
-                onPreviewEnergy: (quest) {
-                  final mappedEnergy = _energyFromLabel(quest.energyLevel);
-                  if (mappedEnergy != null) {
-                    widget.onEnergySelected(mappedEnergy);
-                  }
-                },
-                selectedQuests: _selectedQuests,
-                completedQuestIds: _completedQuestIds,
-                onToggleCompleted: _toggleCompletedQuest,
-                onRemoveQuest: _removeSelectedQuest,
-                completionButtonLabel: _completionButtonLabel(),
-                canFinishDay: _canFinishDay,
-                onFinishDay: _finishDay,
-                memoryNote: _memoryNote,
-                onMemoryTap: _openMemoryPaper,
-                onPrintDoctorPdf: _printDoctorPdf,
-                exportingPdf: _exportingPdf,
-                statusMessage: _statusMessage,
-                selectedCount: selectedCount,
-                completedCount: completedCount,
+            ),
+            const Positioned(
+              left: 28,
+              bottom: 78,
+              child: _MissionCloudDecoration(
+                width: 102,
+                height: 64,
+                opacity: 0.18,
+              ),
+            ),
+            RefreshIndicator(
+              color: const Color(0xFF59A8A1),
+              onRefresh: () => _loadBoard(forceRefresh: true),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  _MissionsHero(
+                    user: _currentUser,
+                    selectedCount: selectedCount,
+                    completedCount: completedCount,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'ลากการ์ดบนสุดไปทางขวาเพื่อเก็บเควส หรือซ้ายเพื่อข้าม',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: _missionMutedInk,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_statusMessage != null) ...[
+                    const SizedBox(height: 12),
+                    _StatusPill(message: _statusMessage!),
+                  ],
+                  const SizedBox(height: 16),
+                  _CombinedDailyBoard(
+                    mood: widget.session.mood,
+                    energy: widget.session.energy,
+                    filterLabels: filterLabels,
+                    energyLevelFilter: _energyLevelFilter,
+                    onFilterSelected: _setFilter,
+                    isRestDay: _isRestDay,
+                    onRestDayChanged: _setRestDay,
+                    onReload: _loadBoard,
+                    loading: _loading,
+                    errorMessage: _errorMessage,
+                    availableQuests: _availableQuests,
+                    onAcceptQuest: _selectQuest,
+                    onSkipQuest: _skipQuest,
+                    onPreviewEnergy: (quest) {
+                      final mappedEnergy = _energyFromLabel(quest.energyLevel);
+                      if (mappedEnergy != null) {
+                        widget.onEnergySelected(mappedEnergy);
+                      }
+                    },
+                    selectedQuests: _selectedQuests,
+                    completedQuestIds: _completedQuestIds,
+                    onToggleCompleted: _toggleCompletedQuest,
+                    onRemoveQuest: _removeSelectedQuest,
+                    completionButtonLabel: _completionButtonLabel(),
+                    canFinishDay: _canFinishDay,
+                    onFinishDay: _finishDay,
+                    memoryNote: _memoryNote,
+                    onMemoryTap: _openMemoryPaper,
+                    onPrintDoctorPdf: _printDoctorPdf,
+                    exportingPdf: _exportingPdf,
+                    statusMessage: _statusMessage,
+                    selectedCount: selectedCount,
+                    completedCount: completedCount,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/*
+              ListView(
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  _MissionsHero(
+                    user: _currentUser,
+                    selectedCount: selectedCount,
+                    completedCount: completedCount,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'ลากการ์ดบนสุดไปทางขวาเพื่อเก็บเควส หรือซ้ายเพื่อข้าม',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF667A85),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_statusMessage != null) ...[
+                    const SizedBox(height: 12),
+                    _StatusPill(message: _statusMessage!),
+                  ],
+                  const SizedBox(height: 16),
+                  _CombinedDailyBoard(
+                    mood: widget.session.mood,
+                    energy: widget.session.energy,
+                    filterLabels: filterLabels,
+                    energyLevelFilter: _energyLevelFilter,
+                    onFilterSelected: _setFilter,
+                    isRestDay: _isRestDay,
+                    onRestDayChanged: _setRestDay,
+                    onReload: _loadBoard,
+                    loading: _loading,
+                    errorMessage: _errorMessage,
+                    availableQuests: _availableQuests,
+                    onAcceptQuest: _selectQuest,
+                    onSkipQuest: _skipQuest,
+                    onPreviewEnergy: (quest) {
+                      final mappedEnergy = _energyFromLabel(quest.energyLevel);
+                      if (mappedEnergy != null) {
+                        widget.onEnergySelected(mappedEnergy);
+                      }
+                    },
+                    selectedQuests: _selectedQuests,
+                    completedQuestIds: _completedQuestIds,
+                    onToggleCompleted: _toggleCompletedQuest,
+                    onRemoveQuest: _removeSelectedQuest,
+                    completionButtonLabel: _completionButtonLabel(),
+                    canFinishDay: _canFinishDay,
+                    onFinishDay: _finishDay,
+                    memoryNote: _memoryNote,
+                    onMemoryTap: _openMemoryPaper,
+                    onPrintDoctorPdf: _printDoctorPdf,
+                    exportingPdf: _exportingPdf,
+                    statusMessage: _statusMessage,
+                    selectedCount: selectedCount,
+                    completedCount: completedCount,
+                  ),
+                ],
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+*/
+
+class _MissionCloudDecoration extends StatelessWidget {
+  const _MissionCloudDecoration({
+    required this.width,
+    required this.height,
+    required this.opacity,
+  });
+
+  final double width;
+  final double height;
+  final double opacity;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Opacity(
+        opacity: opacity,
+        child: SizedBox(
+          width: width,
+          height: height,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: width * 0.05,
+                bottom: height * 0.08,
+                child: _MissionCloudBlob(
+                  size: height * 0.58,
+                  color: const Color(0xFF8FB69D),
+                ),
+              ),
+              Positioned(
+                left: width * 0.28,
+                bottom: height * 0.2,
+                child: _MissionCloudBlob(
+                  size: height * 0.72,
+                  color: const Color(0xFF7FAA91),
+                ),
+              ),
+              Positioned(
+                left: width * 0.55,
+                bottom: height * 0.1,
+                child: _MissionCloudBlob(
+                  size: height * 0.56,
+                  color: const Color(0xFF8FB69D),
+                ),
+              ),
+              Positioned(
+                left: width * 0.02,
+                right: width * 0.04,
+                bottom: 0,
+                child: Container(
+                  height: height * 0.38,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF91B69A),
+                    borderRadius: BorderRadius.circular(999),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF6F987F).withValues(alpha: 0.18),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MissionCloudBlob extends StatelessWidget {
+  const _MissionCloudBlob({required this.size, required this.color});
+
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
     );
   }
 }
@@ -844,19 +1171,19 @@ class _MissionsHero extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFF8FCFB), Color(0xFFE3F3EF)],
+          colors: [Color(0xF5FFFFFF), Color(0xEFDFF8F0), Color(0xEEF8F1C8)],
         ),
-        border: Border.all(color: const Color(0xFFD0E4E0)),
+        border: Border.all(color: const Color(0xFFBFE0D8)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 20,
+            color: const Color(0xFF78BDB5).withValues(alpha: 0.18),
+            blurRadius: 24,
             offset: const Offset(0, 12),
           ),
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Row(
             children: [
@@ -865,7 +1192,7 @@ class _MissionsHero extends StatelessWidget {
                   'Missions',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w900,
-                    color: const Color(0xFF17343C),
+                    color: _missionInk,
                   ),
                 ),
               ),
@@ -877,7 +1204,7 @@ class _MissionsHero extends StatelessWidget {
             'กองเควสแบบ Tinder + ช่องเก็บด้านล่าง + คลังความในใจในหน้าเดียว',
             style: Theme.of(
               context,
-            ).textTheme.bodyMedium?.copyWith(color: const Color(0xFF4D6A72)),
+            ).textTheme.bodyMedium?.copyWith(color: _missionMutedInk),
           ),
           const SizedBox(height: 14),
           Wrap(
@@ -1017,7 +1344,7 @@ class _CombinedDailyBoard extends StatelessWidget {
                 onReload: onReload,
               )
             else
-              _QuestChargeDeck(
+              _QuestTinderDeck(
                 quests: availableQuests,
                 onAccept: onAcceptQuest,
                 onReject: onSkipQuest,
@@ -1242,6 +1569,7 @@ class _RestingModeCard extends StatelessWidget {
           const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   'วันนี้ขอนั่งนิ่ง ๆ ก่อนนะ',
@@ -1450,14 +1778,34 @@ class _QuestDeckEmptyCompanion extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Image.asset(
-            'assets/images/island_parts/rejoy_bot.png',
-            width: 78,
-            height: 78,
-            fit: BoxFit.contain,
-            filterQuality: FilterQuality.high,
+          Container(
+            width: 108,
+            height: 108,
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  Colors.white.withValues(alpha: 0.98),
+                  const Color(0xFFDDF6F2).withValues(alpha: 0.56),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF79BDB2).withValues(alpha: 0.18),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Image.asset(
+              'assets/images/island_parts/rejoy_bot.png',
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+              isAntiAlias: true,
+            ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1629,6 +1977,7 @@ class _QuestTinderDeckState extends State<_QuestTinderDeck> {
   Offset _dragOffset = Offset.zero;
   double _dragAngle = 0;
   bool _swiping = false;
+  bool _settling = false;
 
   QuestItem? get _topQuest =>
       widget.quests.isEmpty ? null : widget.quests.first;
@@ -1647,6 +1996,7 @@ class _QuestTinderDeckState extends State<_QuestTinderDeck> {
 
     setState(() {
       _swiping = true;
+      _settling = false;
       _dragOffset = Offset(targetX, _dragOffset.dy);
       _dragAngle = accepted ? 0.22 : -0.22;
     });
@@ -1658,6 +2008,7 @@ class _QuestTinderDeckState extends State<_QuestTinderDeck> {
       _dragOffset = Offset.zero;
       _dragAngle = 0;
       _swiping = false;
+      _settling = false;
     });
   }
 
@@ -1672,6 +2023,22 @@ class _QuestTinderDeckState extends State<_QuestTinderDeck> {
   Future<void> _rejectTop() async {
     final quest = _topQuest;
     if (quest == null || _swiping) return;
+    if (quest.isDoctorRecommended) {
+      setState(() {
+        _settling = true;
+        _dragOffset = Offset.zero;
+        _dragAngle = 0;
+      });
+      await Future<void>.delayed(const Duration(milliseconds: 180));
+      if (!mounted) return;
+      setState(() => _settling = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('เควสนี้หมอแนะนำให้ทำ จึงเก็บไว้ในกองเควสของวันนี้นะ'),
+        ),
+      );
+      return;
+    }
     await _animateCardAway(false);
     if (!mounted) return;
     widget.onReject(quest);
@@ -1680,6 +2047,7 @@ class _QuestTinderDeckState extends State<_QuestTinderDeck> {
   void _onPanUpdate(DragUpdateDetails details) {
     if (_swiping) return;
     setState(() {
+      _settling = false;
       _dragOffset += details.delta;
       _dragAngle = (_dragOffset.dx / 420).clamp(-0.25, 0.25);
     });
@@ -1700,64 +2068,244 @@ class _QuestTinderDeckState extends State<_QuestTinderDeck> {
     }
 
     setState(() {
+      _settling = true;
       _dragOffset = Offset.zero;
       _dragAngle = 0;
     });
+    await Future<void>.delayed(const Duration(milliseconds: 180));
+    if (!mounted) return;
+    setState(() => _settling = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    final visibleQuests = widget.quests.take(3).toList();
+    final visibleQuests = widget.quests.take(1).toList();
     final topQuest = visibleQuests.isEmpty ? null : visibleQuests.first;
+    final topIsDoctorQuest = topQuest?.isDoctorRecommended == true;
+    final acceptStrength = (_dragOffset.dx / _acceptThreshold)
+        .clamp(0.0, 1.0)
+        .toDouble();
+    final rejectStrength = (-_dragOffset.dx / _acceptThreshold)
+        .clamp(0.0, 1.0)
+        .toDouble();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(
-          height: 300,
-          child: Stack(
-            alignment: Alignment.center,
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFE8F8F2), Color(0xFFDDF3EE), Color(0xFFF7F1DB)],
+        ),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: const Color(0xFFC7E3DD)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF7BC8BE).withValues(alpha: 0.16),
+            blurRadius: 24,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
             children: [
-              for (var i = visibleQuests.length - 1; i >= 0; i--)
-                _QuestDeckCard(
-                  quest: visibleQuests[i],
-                  color: _colorFromHex(visibleQuests[i].color),
-                  depth: visibleQuests.length - 1 - i,
-                  isTop: i == 0,
-                  dragOffset: i == 0 ? _dragOffset : Offset.zero,
-                  dragAngle: i == 0 ? _dragAngle : 0,
-                  onPanUpdate: i == 0 ? _onPanUpdate : null,
-                  onPanEnd: i == 0 ? _onPanEnd : null,
-                  onPreviewEnergy: () =>
-                      widget.onPreviewEnergy(visibleQuests[i]),
+              const Icon(
+                Icons.style_rounded,
+                color: Color(0xFF69B7A9),
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'กองการ์ด Micro-CBT วันนี้',
+                  style: TextStyle(
+                    color: Color(0xFF17343C),
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
+              ),
+              Text(
+                '${widget.quests.length} ใบ',
+                style: const TextStyle(
+                  color: Color(0xFF5F757B),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
             ],
           ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 348,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      color: const Color(0xFFF3FCF8),
+                      border: Border.all(color: const Color(0xFFD2E8E1)),
+                    ),
+                  ),
+                ),
+                for (var i = visibleQuests.length - 1; i >= 0; i--)
+                  _QuestDeckCard(
+                    quest: visibleQuests[i],
+                    color: _colorFromHex(visibleQuests[i].color),
+                    depth: visibleQuests.length - 1 - i,
+                    isTop: i == 0,
+                    dragOffset: i == 0 ? _dragOffset : Offset.zero,
+                    dragAngle: i == 0 ? _dragAngle : 0,
+                    animateMovement: i == 0 && (_swiping || _settling),
+                    onPanUpdate: i == 0 ? _onPanUpdate : null,
+                    onPanEnd: i == 0 ? _onPanEnd : null,
+                    onPreviewEnergy: () =>
+                        widget.onPreviewEnergy(visibleQuests[i]),
+                  ),
+                Positioned(
+                  left: 16,
+                  top: 16,
+                  child: _SwipeDecisionBadge(
+                    label: 'ข้าม',
+                    icon: Icons.close_rounded,
+                    color: const Color(0xFFE37C7C),
+                    opacity: rejectStrength,
+                  ),
+                ),
+                Positioned(
+                  right: 16,
+                  top: 16,
+                  child: _SwipeDecisionBadge(
+                    label: 'เลือก',
+                    icon: Icons.favorite_rounded,
+                    color: const Color(0xFF55B79E),
+                    opacity: acceptStrength,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _DeckActionButton(
+                label: 'ข้าม',
+                icon: Icons.close_rounded,
+                color: const Color(0xFFE37C7C),
+                onPressed: (_swiping || topIsDoctorQuest) ? null : _rejectTop,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  topQuest == null
+                      ? ''
+                      : 'ลากการ์ดให้สุดเพื่อเลือกหรือข้าม ถ้าปัดไม่สุดการ์ดจะกลับมาเอง',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Color(0xFF5F757B),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    height: 1.25,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              _DeckActionButton(
+                label: 'เลือก',
+                icon: Icons.favorite_rounded,
+                color: const Color(0xFF55B79E),
+                onPressed: _swiping ? null : _acceptTop,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SwipeDecisionBadge extends StatelessWidget {
+  const _SwipeDecisionBadge({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.opacity,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+  final double opacity;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 80),
+        opacity: opacity,
+        child: Transform.rotate(
+          angle: label == 'เลือก' ? -0.10 : 0.10,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.92),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: color, width: 1.6),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.18),
+                  blurRadius: 14,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 17, color: color),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(color: color, fontWeight: FontWeight.w900),
+                ),
+              ],
+            ),
+          ),
         ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            TextButton.icon(
-              onPressed: _swiping ? null : _rejectTop,
-              icon: const Icon(Icons.close),
-              label: const Text('Skip'),
-            ),
-            const Spacer(),
-            Text(
-              topQuest == null ? '' : 'ลองปัดการ์ดบนสุด',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: const Color(0xFF5F757B)),
-            ),
-            const Spacer(),
-            TextButton.icon(
-              onPressed: _swiping ? null : _acceptTop,
-              icon: const Icon(Icons.favorite),
-              label: const Text('Take'),
-            ),
-          ],
-        ),
-      ],
+      ),
+    );
+  }
+}
+
+class _DeckActionButton extends StatelessWidget {
+  const _DeckActionButton({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onPressed,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton.icon(
+      onPressed: onPressed,
+      style: FilledButton.styleFrom(
+        backgroundColor: color.withValues(alpha: 0.13),
+        foregroundColor: color,
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      ),
+      icon: Icon(icon, size: 18),
+      label: Text(label, style: const TextStyle(fontWeight: FontWeight.w900)),
     );
   }
 }
@@ -1770,6 +2318,7 @@ class _QuestDeckCard extends StatelessWidget {
     required this.isTop,
     required this.dragOffset,
     required this.dragAngle,
+    required this.animateMovement,
     required this.onPanUpdate,
     required this.onPanEnd,
     required this.onPreviewEnergy,
@@ -1781,78 +2330,79 @@ class _QuestDeckCard extends StatelessWidget {
   final bool isTop;
   final Offset dragOffset;
   final double dragAngle;
+  final bool animateMovement;
   final ValueChanged<DragUpdateDetails>? onPanUpdate;
   final VoidCallback? onPanEnd;
   final VoidCallback onPreviewEnergy;
 
   @override
   Widget build(BuildContext context) {
-    final scale = 1 - (depth * 0.06);
-    final topOffset = depth * 14.0;
-    final opacity = (1 - (depth * 0.14)).clamp(0.55, 1.0);
+    final scale = isTop ? 1.0 : 0.0;
+    final topOffset = isTop ? 0.0 : 0.0;
+    final opacity = isTop ? 1.0 : 0.0;
+
+    final transform = Matrix4.identity()
+      ..translate(dragOffset.dx, dragOffset.dy + topOffset)
+      ..rotateZ(isTop ? dragAngle : 0)
+      ..scale(scale);
+
+    final card = Opacity(
+      opacity: opacity,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF6BAEA1).withValues(alpha: 0.20),
+              blurRadius: 24,
+              offset: const Offset(0, 14),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: GestureDetector(
+            onPanUpdate: onPanUpdate == null
+                ? null
+                : (details) => onPanUpdate!(details),
+            onPanEnd: onPanEnd == null ? null : (_) => onPanEnd!(),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(
+                  color: isTop
+                      ? const Color(0xFFB8DDD4)
+                      : const Color(0xFFE4F1ED),
+                  width: 1.4,
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+                child: depth == 0
+                    ? _TopQuestCardBody(
+                        quest: quest,
+                        color: color,
+                        onPreviewEnergy: onPreviewEnergy,
+                      )
+                    : _HiddenStackedQuestCardBody(depth: depth),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
 
     return Positioned.fill(
       child: IgnorePointer(
         ignoring: !isTop,
-        child: Transform.translate(
-          offset: Offset(dragOffset.dx, dragOffset.dy + topOffset),
-          child: Transform.rotate(
-            angle: isTop ? dragAngle : 0,
-            child: Transform.scale(
-              scale: scale,
-              child: Opacity(
-                opacity: opacity,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 6),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(28),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.10),
-                        blurRadius: 20,
-                        offset: const Offset(0, 12),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(28),
-                    child: GestureDetector(
-                      onPanUpdate: onPanUpdate == null
-                          ? null
-                          : (details) => onPanUpdate!(details),
-                      onPanEnd: onPanEnd == null ? null : (_) => onPanEnd!(),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Colors.white,
-                              color.withValues(alpha: 0.16),
-                            ],
-                          ),
-                          border: Border.all(color: const Color(0xFFD7E6E3)),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(18),
-                          child: depth == 0
-                              ? _TopQuestCardBody(
-                                  quest: quest,
-                                  color: color,
-                                  onPreviewEnergy: onPreviewEnergy,
-                                )
-                              : _StackedQuestCardBody(
-                                  quest: quest,
-                                  color: color,
-                                ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
+        child: AnimatedContainer(
+          duration: animateMovement
+              ? const Duration(milliseconds: 190)
+              : Duration.zero,
+          curve: Curves.easeOutCubic,
+          transform: transform,
+          child: card,
         ),
       ),
     );
@@ -1879,39 +2429,57 @@ class _TopQuestCardBody extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 14,
-              height: 14,
-              margin: const EdgeInsets.only(top: 6),
+              width: 16,
+              height: 16,
+              margin: const EdgeInsets.only(top: 8),
               decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     quest.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 20,
+                      fontSize: 25,
                       fontWeight: FontWeight.w900,
                       color: Color(0xFF17343C),
+                      letterSpacing: -0.6,
+                      height: 1.08,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 10),
                   Text(
                     quest.description,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Color(0xFF557079),
-                      height: 1.35,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      height: 1.34,
                     ),
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 10),
-            _EnergyBadge(label: quest.energyLevel.toUpperCase(), color: color),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (quest.isDoctorRecommended) ...[
+                  const _DoctorRecommendedBadge(),
+                  const SizedBox(height: 8),
+                ],
+                _EnergyBadge(
+                  label: quest.energyLevel.toUpperCase(),
+                  color: color,
+                ),
+              ],
+            ),
           ],
         ),
         const SizedBox(height: 14),
@@ -1921,7 +2489,6 @@ class _TopQuestCardBody extends StatelessWidget {
           children: [
             _Tag(label: 'Pastel companion: ${quest.animalId}'),
             _Tag(label: _gentleEnergyLabel(quest.energyLevel)),
-            _Tag(label: 'Small step'),
           ],
         ),
         const Spacer(),
@@ -1929,8 +2496,14 @@ class _TopQuestCardBody extends StatelessWidget {
           children: [
             TextButton.icon(
               onPressed: onPreviewEnergy,
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF6A8F94),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: const Size(0, 36),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
               icon: const Icon(Icons.visibility_outlined),
-              label: const Text('Preview energy'),
+              label: const Text('ดูพลังงาน'),
             ),
             const Spacer(),
             const _SwipeHint(label: '← Skip', color: Color(0xFFE37C7C)),
@@ -1943,36 +2516,45 @@ class _TopQuestCardBody extends StatelessWidget {
   }
 }
 
-class _StackedQuestCardBody extends StatelessWidget {
-  const _StackedQuestCardBody({required this.quest, required this.color});
+class _HiddenStackedQuestCardBody extends StatelessWidget {
+  const _HiddenStackedQuestCardBody({required this.depth});
 
-  final QuestItem quest;
-  final Color color;
+  final int depth;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final alpha = (0.24 - depth * 0.04).clamp(0.10, 0.24).toDouble();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 12,
+          width: 86,
           height: 12,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          decoration: BoxDecoration(
+            color: const Color(0xFF8FBFB5).withValues(alpha: alpha),
+            borderRadius: BorderRadius.circular(99),
+          ),
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            quest.name,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF17343C),
+        const SizedBox(height: 14),
+        Container(
+          width: double.infinity,
+          height: 14,
+          decoration: BoxDecoration(
+            color: const Color(0xFFBFD8D2).withValues(alpha: alpha),
+            borderRadius: BorderRadius.circular(99),
+          ),
+        ),
+        const SizedBox(height: 9),
+        FractionallySizedBox(
+          widthFactor: 0.72,
+          child: Container(
+            height: 14,
+            decoration: BoxDecoration(
+              color: const Color(0xFFD7E8E3).withValues(alpha: alpha),
+              borderRadius: BorderRadius.circular(99),
             ),
           ),
         ),
-        const SizedBox(width: 10),
-        _EnergyBadge(label: quest.energyLevel.toUpperCase(), color: color),
       ],
     );
   }
@@ -2062,13 +2644,28 @@ class _QuestSlotCard extends StatelessWidget {
                   ),
                 ),
               ),
-              IconButton(
-                onPressed: onRemove,
-                icon: const Icon(Icons.close),
-                tooltip: 'Remove',
-              ),
+              if (quest.isDoctorRecommended)
+                const Tooltip(
+                  message: 'เควสจากหมอ',
+                  child: Icon(
+                    Icons.verified_rounded,
+                    color: Color(0xFF58AFA3),
+                    size: 20,
+                  ),
+                )
+              else
+                IconButton(
+                  onPressed: onRemove,
+                  icon: const Icon(Icons.close),
+                  tooltip: 'Remove',
+                ),
             ],
           ),
+          if (quest.isDoctorRecommended) ...[
+            const SizedBox(height: 6),
+            const _DoctorRecommendedBadge(),
+            const SizedBox(height: 6),
+          ],
           Text(
             '${quest.energyLevel.toUpperCase()} · ${quest.animalId}',
             style: const TextStyle(color: Color(0xFF607A81), fontSize: 12),
@@ -2160,14 +2757,22 @@ class _SoftSectionCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FBFA),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withValues(alpha: 0.88),
+            const Color(0xFFE9FAF4).withValues(alpha: 0.9),
+            const Color(0xFFFFF5D7).withValues(alpha: 0.72),
+          ],
+        ),
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: const Color(0xFFD5E5E2)),
+        border: Border.all(color: const Color(0xFFBFE0D8)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
+            color: const Color(0xFF6DBCB2).withValues(alpha: 0.14),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
           ),
         ],
       ),
@@ -2179,11 +2784,11 @@ class _SoftSectionCard extends StatelessWidget {
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w900,
-              color: Color(0xFF16323A),
+              color: _missionInk,
             ),
           ),
           const SizedBox(height: 6),
-          Text(subtitle, style: const TextStyle(color: Color(0xFF5D757B))),
+          Text(subtitle, style: const TextStyle(color: _missionMutedInk)),
           const SizedBox(height: 14),
           child,
         ],
@@ -2222,8 +2827,9 @@ class _Tag extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFEAF5F4),
+        color: Colors.white.withValues(alpha: 0.82),
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFCBE5DD)),
       ),
       child: Text(
         label,
@@ -2285,6 +2891,48 @@ class _Badge extends StatelessWidget {
       child: Text(
         text,
         style: const TextStyle(color: Colors.white, fontSize: 12),
+      ),
+    );
+  }
+}
+
+class _DoctorRecommendedBadge extends StatelessWidget {
+  const _DoctorRecommendedBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF4D8),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFE0AD3D), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFE0AD3D).withValues(alpha: 0.14),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.medical_information_rounded,
+            size: 15,
+            color: Color(0xFF9A6B12),
+          ),
+          SizedBox(width: 6),
+          Text(
+            'หมอแนะนำให้ทำ',
+            style: TextStyle(
+              color: Color(0xFF7A520B),
+              fontWeight: FontWeight.w900,
+              fontSize: 12,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2482,9 +3130,20 @@ class _TimeCapsuleStats extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFEFF7F4),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xF2FFFFFF), Color(0xFFE7F8F1)],
+        ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFD0E4DD)),
+        border: Border.all(color: const Color(0xFFC7E3DA)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF76BDB3).withValues(alpha: 0.08),
+            blurRadius: 14,
+            offset: const Offset(0, 7),
+          ),
+        ],
       ),
       child: Wrap(
         spacing: 8,
@@ -2519,9 +3178,20 @@ class _MemoryVault extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF6FAF5),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xF7FFFFFF), Color(0xFFE9F9F2), Color(0xFFFFF3CF)],
+        ),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFD1E3D9)),
+        border: Border.all(color: const Color(0xFFBFE0D8)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF77BEB4).withValues(alpha: 0.12),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2533,14 +3203,18 @@ class _MemoryVault extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFFCF0),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFFFFFFFF), Color(0xFFFFF8E2)],
+                ),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: const Color(0xFFE4D3A4)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
+                    color: const Color(0xFFE6B95D).withValues(alpha: 0.16),
+                    blurRadius: 18,
+                    offset: const Offset(0, 9),
                   ),
                 ],
               ),
@@ -2551,14 +3225,27 @@ class _MemoryVault extends StatelessWidget {
                     width: 58,
                     height: 58,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE3B865),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFB98434)),
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFFFFF8DA), Color(0xFFFFE3A4)],
+                      ),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: Color(0xFFE5B85F)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Color(0xFFE7B65C).withValues(alpha: 0.24),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
                     ),
-                    child: const Icon(
-                      Icons.menu_book_rounded,
-                      color: Colors.white,
-                      size: 32,
+                    child: Padding(
+                      padding: const EdgeInsets.all(7),
+                      child: Image.asset(
+                        'assets/images/island_parts/treasure_chest.png',
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 14),
@@ -2576,7 +3263,7 @@ class _MemoryVault extends StatelessWidget {
                         ),
                         const SizedBox(height: 5),
                         const Text(
-                          'ข้อมูลนี้จะถูกเก็บใน PDF สำหรับพิมพ์ให้หมอ',
+                          'ข้อความนี้จะถูกเก็บใน PDF สำหรับพิมพ์ให้หมอ',
                           style: TextStyle(
                             color: Color(0xFF6C7F79),
                             fontSize: 13,

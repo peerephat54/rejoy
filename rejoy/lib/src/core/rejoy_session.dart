@@ -53,6 +53,7 @@ class ReJoySession {
     required this.missionsDone,
     required this.privateMode,
     required this.journal,
+    required this.unlockedAnimals,
   });
 
   factory ReJoySession.seed() {
@@ -66,6 +67,7 @@ class ReJoySession {
       dailyQuestions: 3,
       missionsDone: 1,
       privateMode: true,
+      unlockedAnimals: <String>[],
       journal: [
         JournalEntry(
           message: 'First day on ReJoy.',
@@ -86,6 +88,7 @@ class ReJoySession {
   int missionsDone;
   bool privateMode;
   final List<JournalEntry> journal;
+  final List<String> unlockedAnimals;
 
   void addJournal(String message, {bool highlight = false}) {
     journal.insert(
@@ -98,6 +101,15 @@ class ReJoySession {
     );
     if (journal.length > 12) {
       journal.removeLast();
+    }
+  }
+
+  void mergeUnlockedAnimals(Iterable<String> animalIds) {
+    for (final animalId in animalIds) {
+      final trimmed = animalId.trim();
+      if (trimmed.isNotEmpty && !unlockedAnimals.contains(trimmed)) {
+        unlockedAnimals.add(trimmed);
+      }
     }
   }
 

@@ -4,7 +4,7 @@ class ReJoyLoadingScreen extends StatelessWidget {
   const ReJoyLoadingScreen({
     super.key,
     this.title = 'ยินดีต้อนรับสู่ ReJoy',
-    this.message = 'กำลังเตรียมเกาะจำลองและระบบบันทึก...',
+    this.message = 'กำลังเตรียมเกาะและข้อมูลของคุณ...',
     this.progress = 0.8,
   });
 
@@ -28,7 +28,7 @@ class ReJoyLoadingView extends StatefulWidget {
   const ReJoyLoadingView({
     super.key,
     this.title = 'ยินดีต้อนรับสู่ ReJoy',
-    this.message = 'กำลังเตรียมเกาะจำลองและระบบบันทึก...',
+    this.message = 'กำลังเตรียมเกาะและข้อมูลของคุณ...',
     this.progress = 0.8,
     this.compact = false,
   });
@@ -51,7 +51,7 @@ class _ReJoyLoadingViewState extends State<ReJoyLoadingView>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1300),
+      duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
   }
 
@@ -78,66 +78,86 @@ class _ReJoyLoadingViewState extends State<ReJoyLoadingView>
         child: AnimatedBuilder(
           animation: _controller,
           builder: (context, child) {
-            final pulse = 1 + (_controller.value * 0.075);
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  widget.title,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: const Color(0xFF101B2A),
-                    fontSize: widget.compact ? 16 : 20,
-                    fontWeight: FontWeight.w900,
+            final pulse = 1 + (_controller.value * 0.055);
+            return DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.72),
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF6BAEA8).withValues(alpha: 0.13),
+                    blurRadius: 34,
+                    offset: const Offset(0, 18),
                   ),
+                ],
+              ),
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: widget.compact ? 22 : 30,
+                  vertical: widget.compact ? 20 : 30,
                 ),
-                SizedBox(height: widget.compact ? 18 : 34),
-                Transform.scale(
-                  scale: pulse,
-                  child: CustomPaint(
-                    size: Size(
-                      widget.compact ? 108 : 170,
-                      widget.compact ? 96 : 152,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      widget.title,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: const Color(0xFF17343C),
+                        fontSize: widget.compact ? 16 : 21,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
-                    painter: _HeartPainter(),
-                  ),
-                ),
-                SizedBox(height: widget.compact ? 16 : 22),
-                SizedBox(
-                  width: widget.compact ? 150 : 190,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(99),
-                    child: LinearProgressIndicator(
-                      minHeight: widget.compact ? 5 : 6,
-                      value: widget.progress.clamp(0.0, 1.0),
-                      backgroundColor: const Color(0xFFD9DEE5),
-                      color: const Color(0xFFFFC5D8),
+                    SizedBox(height: widget.compact ? 18 : 30),
+                    Transform.scale(
+                      scale: pulse,
+                      child: CustomPaint(
+                        size: Size(
+                          widget.compact ? 108 : 168,
+                          widget.compact ? 96 : 150,
+                        ),
+                        painter: _HeartPainter(),
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${(widget.progress * 100).round()}% Loaded',
-                  style: TextStyle(
-                    color: const Color(0xFF101B2A),
-                    fontSize: widget.compact ? 12 : 14,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 28),
-                  child: Text(
-                    widget.message,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: const Color(0xFF101B2A),
-                      fontSize: widget.compact ? 11 : 13,
-                      fontWeight: FontWeight.w800,
+                    SizedBox(height: widget.compact ? 16 : 22),
+                    SizedBox(
+                      width: widget.compact ? 150 : 190,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(99),
+                        child: LinearProgressIndicator(
+                          minHeight: widget.compact ? 5 : 6,
+                          value: widget.progress.clamp(0.0, 1.0),
+                          backgroundColor: const Color(0xFFD9DEE5),
+                          color: const Color(0xFFFFBFD5),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'โหลดแล้ว ${(widget.progress * 100).round()}%',
+                      style: TextStyle(
+                        color: const Color(0xFF17343C),
+                        fontSize: widget.compact ? 12 : 14,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Text(
+                        widget.message,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: const Color(0xFF526D73),
+                          fontSize: widget.compact ? 11 : 13,
+                          fontWeight: FontWeight.w800,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             );
           },
         ),

@@ -52,15 +52,25 @@ class _IslandScreenState extends State<IslandScreen>
 
   Future<_IslandData> _loadIsland() async {
     try {
-      final profile = await _client.fetchActiveClinicalProfile();
+      final profile = await _client.fetchActiveClinicalProfile(
+        forceRefresh: true,
+      );
       final latestReport = profile.reports.isEmpty
           ? null
           : profile.reports.first;
+      final animals = _mergeAnimalIds(
+        profile.user.unlockedAnimals,
+        widget.session.unlockedAnimals,
+      );
+      final displayAnimals = animals.isEmpty
+          ? _animalsFromQuestProgress(profile.user.completedQuestsCount)
+          : animals;
+      widget.session.mergeUnlockedAnimals(displayAnimals);
       return _IslandData(
         user: profile.user,
         phq9Score:
             latestReport?.phq9Score ?? profile.user.completedQuestsCount % 9,
-        animals: profile.user.unlockedAnimals.take(8).toList(),
+        animals: displayAnimals.take(8).toList(),
         animalNicknames: profile.user.animalNicknames,
         backendOnline: true,
         backendLabel: 'DB connected',
@@ -69,12 +79,39 @@ class _IslandScreenState extends State<IslandScreen>
       return _IslandData(
         user: null,
         phq9Score: _scoreFromSession(widget.session.mood),
-        animals: const [],
+        animals: widget.session.unlockedAnimals.take(8).toList(),
         animalNicknames: const {},
         backendOnline: false,
         backendLabel: 'offline preview',
       );
     }
+  }
+
+  List<String> _mergeAnimalIds(List<String> primary, List<String> fallback) {
+    final merged = <String>[];
+    for (final animalId in [...primary, ...fallback]) {
+      final trimmed = animalId.trim();
+      if (trimmed.isNotEmpty && !merged.contains(trimmed)) {
+        merged.add(trimmed);
+      }
+    }
+    return merged;
+  }
+
+  List<String> _animalsFromQuestProgress(int completedQuestsCount) {
+    final unlockCount = (completedQuestsCount ~/ 3).clamp(0, 8);
+    if (unlockCount == 0) return const <String>[];
+    const encounterOrder = <String>[
+      'panda-01',
+      'red-panda-02',
+      'capybara-03',
+      'koala-04',
+      'bear-05',
+      'owl-06',
+      'fox-07',
+      'deer-08',
+    ];
+    return encounterOrder.take(unlockCount).toList();
   }
 
   int _scoreFromSession(MoodState mood) {
@@ -111,7 +148,7 @@ class _IslandScreenState extends State<IslandScreen>
             _IslandData(
               user: null,
               phq9Score: _scoreFromSession(widget.session.mood),
-              animals: const [],
+              animals: widget.session.unlockedAnimals.take(8).toList(),
               animalNicknames: const {},
               backendOnline: false,
               backendLabel: 'loading island',
@@ -119,57 +156,58 @@ class _IslandScreenState extends State<IslandScreen>
         final displayPhq9Score = _demoWeatherScore ?? data.phq9Score;
         final weather = _IslandWeather.fromPhq9(displayPhq9Score);
 
-        return AnimatedBuilder(
-          animation: _controller,
-          builder: (context, _) {
-            return AnimatedContainer(
-              duration: const Duration(milliseconds: 900),
-              curve: Curves.easeInOutCubic,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: weather.skyColors,
-                ),
-              ),
-              child: SafeArea(
-                child: RefreshIndicator(
-                  onRefresh: _refresh,
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 18),
-                    children: [
-                      Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 390),
-                          child: Container(
-                            height: math.min(
-                              MediaQuery.of(context).size.height * 0.84,
-                              720,
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 900),
+          curve: Curves.easeInOutCubic,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: weather.skyColors,
+            ),
+          ),
+          child: SafeArea(
+            child: RefreshIndicator(
+              onRefresh: _refresh,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 18),
+                children: [
+                  Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 390),
+                      child: Container(
+                        height: math.min(
+                          MediaQuery.of(context).size.height * 0.84,
+                          720,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(34),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.72),
+                            width: 1.4,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(
+                                0xFF41616A,
+                              ).withValues(alpha: 0.18),
+                              blurRadius: 34,
+                              offset: const Offset(0, 20),
                             ),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(34),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.72),
-                                width: 1.4,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(
-                                    0xFF41616A,
-                                  ).withValues(alpha: 0.18),
-                                  blurRadius: 34,
-                                  offset: const Offset(0, 20),
-                                ),
-                              ],
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(34),
-                              child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 650),
-                                switchInCurve: Curves.easeOutCubic,
-                                switchOutCurve: Curves.easeInCubic,
-                                child: Stack(
-                                  key: ValueKey(weather.kind),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(34),
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 650),
+                            switchInCurve: Curves.easeOutCubic,
+                            switchOutCurve: Curves.easeInCubic,
+                            child: AnimatedBuilder(
+                              key: ValueKey(weather.kind),
+                              animation: _controller,
+                              builder: (context, _) {
+                                final progress = _controller.value;
+                                return Stack(
                                   clipBehavior: Clip.none,
                                   children: [
                                     Positioned.fill(
@@ -177,7 +215,7 @@ class _IslandScreenState extends State<IslandScreen>
                                         child: CustomPaint(
                                           painter: _IslandPainter(
                                             weather: weather,
-                                            progress: _controller.value,
+                                            progress: progress,
                                           ),
                                         ),
                                       ),
@@ -186,9 +224,7 @@ class _IslandScreenState extends State<IslandScreen>
                                       child: LayoutBuilder(
                                         builder: (context, constraints) {
                                           final bob =
-                                              math.sin(
-                                                _controller.value * math.pi * 2,
-                                              ) *
+                                              math.sin(progress * math.pi * 2) *
                                               4;
                                           return Align(
                                             alignment: const Alignment(0, 0.08),
@@ -198,7 +234,7 @@ class _IslandScreenState extends State<IslandScreen>
                                                 width:
                                                     constraints.maxWidth * 1.16,
                                                 weather: weather,
-                                                progress: _controller.value,
+                                                progress: progress,
                                               ),
                                             ),
                                           );
@@ -207,10 +243,10 @@ class _IslandScreenState extends State<IslandScreen>
                                     ),
                                     Positioned(
                                       top: 58,
-                                      left: -44,
-                                      right: -44,
+                                      left: -70,
+                                      right: -70,
                                       child: _GloomyCloudCanopy(
-                                        progress: _controller.value,
+                                        progress: progress,
                                         weather: weather,
                                       ),
                                     ),
@@ -223,18 +259,18 @@ class _IslandScreenState extends State<IslandScreen>
                                       ),
                                     ),
                                     Positioned(
-                                      top: 108,
-                                      left: 24,
-                                      child: _ChatBotPortalButton(
-                                        progress: _controller.value,
+                                      top: 104,
+                                      left: 18,
+                                      child: _ChatBotPortalControl(
+                                        progress: progress,
                                         onPressed: widget.onChatSelected,
                                       ),
                                     ),
                                     Positioned(
-                                      top: 82,
-                                      right: 30,
-                                      child: _LighthousePortalButton(
-                                        progress: _controller.value,
+                                      top: 94,
+                                      right: 20,
+                                      child: _LighthousePortalControl(
+                                        progress: progress,
                                         onPressed: widget.onSosSelected,
                                       ),
                                     ),
@@ -243,46 +279,52 @@ class _IslandScreenState extends State<IslandScreen>
                                       Positioned(
                                         left: 28,
                                         right: 28,
-                                        bottom: 82,
+                                        bottom: 58,
                                         child: _EmptyAnimalGuide(
                                           weather: weather,
                                         ),
                                       ),
+                                    Positioned.fill(
+                                      child: _RainImageOverlay(
+                                        weather: weather,
+                                        progress: progress,
+                                      ),
+                                    ),
                                     Positioned.fill(
                                       child: IgnorePointer(
                                         child: RepaintBoundary(
                                           child: CustomPaint(
                                             painter: _FrontWeatherPainter(
                                               weather: weather,
-                                              progress: _controller.value,
+                                              progress: progress,
                                             ),
                                           ),
                                         ),
                                       ),
                                     ),
                                   ],
-                                ),
-                              ),
+                                );
+                              },
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 390),
-                          child: _WeatherModePicker(
-                            selectedScore: displayPhq9Score,
-                            onSelected: _selectDemoWeather,
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 390),
+                      child: _WeatherModePicker(
+                        selectedScore: displayPhq9Score,
+                        onSelected: _selectDemoWeather,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            );
-          },
+            ),
+          ),
         );
       },
     );
@@ -293,22 +335,22 @@ class _IslandScreenState extends State<IslandScreen>
     if (animals.isEmpty) return const [];
     final safeAnimals = animals;
     final positions = [
-      const Offset(0.34, 0.49),
-      const Offset(0.46, 0.46),
-      const Offset(0.56, 0.51),
-      const Offset(0.40, 0.58),
-      const Offset(0.61, 0.59),
-      const Offset(0.30, 0.57),
-      const Offset(0.50, 0.61),
-      const Offset(0.66, 0.50),
+      const Offset(0.34, 0.55),
+      const Offset(0.46, 0.53),
+      const Offset(0.56, 0.57),
+      const Offset(0.40, 0.63),
+      const Offset(0.61, 0.64),
+      const Offset(0.30, 0.62),
+      const Offset(0.50, 0.66),
+      const Offset(0.66, 0.56),
     ];
 
     return List.generate(math.min(safeAnimals.length, positions.length), (
       index,
     ) {
       final phase = (_controller.value + index * 0.17) % 1;
-      final bob = math.sin(phase * math.pi * 2) * 5;
-      final sway = math.cos(phase * math.pi * 2) * 4;
+      final bob = math.sin(phase * math.pi * 2) * 2.5;
+      final sway = math.cos(phase * math.pi * 2) * 3;
       final animal = _PastelAnimal.fromId(safeAnimals[index], index);
       final animalId = safeAnimals[index];
       final nickname = data.animalNicknames[animalId] ?? '';
@@ -372,35 +414,90 @@ class _IslandScreenState extends State<IslandScreen>
     final nickname = await showDialog<String>(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFFF8FCFB),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          title: const Text('ตั้งชื่อเพื่อนบนเกาะ'),
-          content: TextField(
-            controller: controller,
-            maxLength: 24,
-            autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'ชื่อสัตว์',
-              hintText: 'เช่น มะลิ, เจ้าก้อนเมฆ',
+        final baseTheme = Theme.of(context);
+        final dialogTheme = baseTheme.copyWith(
+          textTheme: baseTheme.textTheme.copyWith(
+            headlineSmall: const TextStyle(
+              color: Color(0xFF17343C),
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+            ),
+            bodyLarge: const TextStyle(
+              color: Color(0xFF17343C),
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+            ),
+            bodyMedium: const TextStyle(
+              color: Color(0xFF557178),
+              fontWeight: FontWeight.w700,
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('ยกเลิก'),
+          inputDecorationTheme: const InputDecorationTheme(
+            labelStyle: TextStyle(
+              color: Color(0xFF557178),
+              fontWeight: FontWeight.w800,
             ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, ''),
-              child: const Text('ลบชื่อ'),
+            hintStyle: TextStyle(
+              color: Color(0xFF8EA5AB),
+              fontWeight: FontWeight.w600,
             ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, controller.text.trim()),
-              child: const Text('บันทึก'),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: Color(0xFF9DB7FF), width: 1.4),
             ),
-          ],
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: Color(0xFF5F8FEF), width: 2),
+            ),
+            counterStyle: TextStyle(
+              color: Color(0xFF557178),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          textButtonTheme: TextButtonThemeData(
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF5F8FEF),
+              textStyle: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+          filledButtonTheme: FilledButtonThemeData(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF5F8FEF),
+              foregroundColor: Colors.white,
+              textStyle: const TextStyle(fontWeight: FontWeight.w900),
+            ),
+          ),
+        );
+        return Theme(
+          data: dialogTheme,
+          child: AlertDialog(
+            backgroundColor: const Color(0xFFF8FCFB),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            title: const Text('ตั้งชื่อเพื่อนบนเกาะ'),
+            content: TextField(
+              controller: controller,
+              maxLength: 24,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'ชื่อสัตว์',
+                hintText: 'เช่น มะลิ, เจ้าก้อนเมฆ',
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('ยกเลิก'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, ''),
+                child: const Text('ลบชื่อ'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, controller.text.trim()),
+                child: const Text('บันทึก'),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -647,9 +744,9 @@ class _GloomyCloudCanopy extends StatelessWidget {
     final stormAlpha = weather.kind == _WeatherKind.cloudy ? 0.88 : 0.96;
     final drift = math.sin(progress * math.pi * 2) * 24;
     final cloudHeight = switch (weather.kind) {
-      _WeatherKind.cloudy => 230.0,
-      _WeatherKind.rain => 258.0,
-      _WeatherKind.storm => 292.0,
+      _WeatherKind.cloudy => 286.0,
+      _WeatherKind.rain => 322.0,
+      _WeatherKind.storm => 356.0,
       _WeatherKind.sunny => 0.0,
     };
     return IgnorePointer(
@@ -687,33 +784,33 @@ class _ChatBotPortalButton extends StatelessWidget {
     return Tooltip(
       message: 'คุยกับ ReJoy bot',
       child: InkWell(
-        borderRadius: BorderRadius.circular(36),
+        borderRadius: BorderRadius.circular(40),
         onTap: onPressed,
         child: Transform.translate(
           offset: Offset(0, bob),
           child: Container(
-            width: 116,
-            height: 116,
+            width: 98,
+            height: 98,
             alignment: Alignment.center,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
                   color: const Color(0xFF12333C).withValues(alpha: 0.18),
-                  blurRadius: 24,
-                  offset: const Offset(0, 12),
+                  blurRadius: 22,
+                  offset: const Offset(0, 10),
                 ),
                 BoxShadow(
-                  color: Colors.white.withValues(alpha: 0.32),
-                  blurRadius: 20,
-                  spreadRadius: 4,
+                  color: Colors.white.withValues(alpha: 0.46),
+                  blurRadius: 24,
+                  spreadRadius: 6,
                 ),
               ],
             ),
             child: Image.asset(
-              'assets/images/island_parts/rejoy_bot.png',
-              width: 112,
-              height: 112,
+              'assets/images/island_parts/rejoy_bot_icon.png',
+              width: 88,
+              height: 88,
               fit: BoxFit.contain,
               filterQuality: FilterQuality.high,
             ),
@@ -735,41 +832,48 @@ class _LighthousePortalButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final glow = 0.55 + math.sin(progress * math.pi * 2) * 0.22;
+    final glow = 0.34 + math.sin(progress * math.pi * 2) * 0.10;
     return Tooltip(
       message: 'เข้า SOS',
       child: InkWell(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(32),
         onTap: onPressed,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 58,
+              width: 96,
               height: 84,
+              alignment: Alignment.center,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
                     color: const Color(0xFFFFE4A3).withValues(alpha: glow),
                     blurRadius: 24,
-                    spreadRadius: 2,
+                    spreadRadius: 7,
                   ),
                 ],
               ),
-              child: Image.asset(
-                'assets/images/island_parts/lighthouse.png',
-                fit: BoxFit.contain,
-                filterQuality: FilterQuality.high,
+              child: Transform.scale(
+                scale: 1,
+                child: Image.asset(
+                  'assets/images/island_parts/lighthouse_icon.png',
+                  width: 76,
+                  height: 76,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.high,
+                  isAntiAlias: true,
+                ),
               ),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 0),
             Text(
               'SOS',
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.92),
                 fontSize: 13,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w900,
                 shadows: [
                   Shadow(
                     color: Colors.black.withValues(alpha: 0.42),
@@ -779,6 +883,192 @@ class _LighthousePortalButton extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ChatBotPortalControl extends StatelessWidget {
+  const _ChatBotPortalControl({
+    required this.progress,
+    required this.onPressed,
+  });
+
+  final double progress;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final bob = math.sin(progress * math.pi * 2) * 5;
+    return Semantics(
+      button: true,
+      label: 'คุยกับ ReJoy bot',
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onPressed,
+          child: Transform.translate(
+            offset: Offset(0, bob),
+            child: SizedBox(
+              width: 96,
+              height: 122,
+              child: Stack(
+                alignment: Alignment.topCenter,
+                children: [
+                  Positioned(
+                    top: 0,
+                    child: Container(
+                      width: 86,
+                      height: 86,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.white.withValues(alpha: 0.52),
+                            blurRadius: 28,
+                            spreadRadius: 8,
+                          ),
+                          BoxShadow(
+                            color: const Color(
+                              0xFF8AD7E2,
+                            ).withValues(alpha: 0.34),
+                            blurRadius: 24,
+                            spreadRadius: 4,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 0,
+                    child: Image.asset(
+                      'assets/images/island_parts/rejoy_bot_icon.png',
+                      width: 88,
+                      height: 88,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
+                    ),
+                  ),
+                  Positioned(
+                    top: 88,
+                    child: Text(
+                      'Chatbot',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.95),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.2,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black.withValues(alpha: 0.48),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LighthousePortalControl extends StatelessWidget {
+  const _LighthousePortalControl({
+    required this.progress,
+    required this.onPressed,
+  });
+
+  final double progress;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final glow = 0.36 + math.sin(progress * math.pi * 2) * 0.07;
+    final bob = math.cos(progress * math.pi * 2) * 2.5;
+    return Semantics(
+      button: true,
+      label: 'เข้า SOS',
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onPressed,
+          child: Transform.translate(
+            offset: Offset(0, bob),
+            child: SizedBox(
+              width: 104,
+              height: 122,
+              child: Stack(
+                alignment: Alignment.topCenter,
+                children: [
+                  Positioned(
+                    top: 7,
+                    child: Container(
+                      width: 86,
+                      height: 86,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(
+                              0xFFFFE6A9,
+                            ).withValues(alpha: glow),
+                            blurRadius: 28,
+                            spreadRadius: 10,
+                          ),
+                          BoxShadow(
+                            color: const Color(
+                              0xFFFFF8D9,
+                            ).withValues(alpha: glow * 0.48),
+                            blurRadius: 18,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 0,
+                    child: Image.asset(
+                      'assets/images/island_parts/lighthouse_portal_icon.png',
+                      width: 76,
+                      height: 96,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
+                      isAntiAlias: true,
+                    ),
+                  ),
+                  Positioned(
+                    top: 94,
+                    child: Text(
+                      'SOS',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.95),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.2,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black.withValues(alpha: 0.48),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -991,7 +1281,7 @@ class _AnimalSprite extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 260),
-      opacity: sleepy ? 0.72 : 1,
+      opacity: sleepy ? 0.94 : 1,
       child: Container(
         width: animal.size,
         height: animal.size,
@@ -1071,6 +1361,81 @@ class _EmptyAnimalGuide extends StatelessWidget {
   }
 }
 
+class _RainImageOverlay extends StatelessWidget {
+  const _RainImageOverlay({required this.weather, required this.progress});
+
+  final _IslandWeather weather;
+  final double progress;
+
+  static const _drops = [
+    'assets/images/island_parts/rain_drop_1.png',
+    'assets/images/island_parts/rain_drop_2.png',
+    'assets/images/island_parts/rain_drop_3.png',
+    'assets/images/island_parts/rain_drop_4.png',
+    'assets/images/island_parts/rain_drop_5.png',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    if (weather.kind == _WeatherKind.sunny ||
+        weather.kind == _WeatherKind.cloudy) {
+      return const SizedBox.shrink();
+    }
+
+    final isStorm = weather.kind == _WeatherKind.storm;
+    final dropCount = isStorm ? 34 : 22;
+    final speed = isStorm ? 1.42 : 1.05;
+
+    return IgnorePointer(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          final height = constraints.maxHeight;
+          return Stack(
+            clipBehavior: Clip.none,
+            children: List.generate(dropCount, (index) {
+              final seed = index * 41.73 + 9.31;
+              final lane = (math.sin(seed) * 0.5 + 0.5).clamp(0.0, 1.0);
+              final phase = (index * 0.38196601125 + math.sin(seed) * 0.23)
+                  .abs();
+              final cycle = (progress * speed + phase) % 1.0;
+              final drift = isStorm ? 142.0 : 94.0;
+              final baseX = lane * (width + drift * 1.2) - drift;
+              final x =
+                  baseX +
+                  cycle * drift +
+                  math.sin(progress * math.pi * 2.2 + seed) * 7;
+              final y = cycle * (height + 250) - 150;
+              final dropWidth =
+                  (isStorm ? 13.0 : 9.0) + (index % 5) * (isStorm ? 1.6 : 1.0);
+              final opacity = (isStorm ? 0.42 : 0.30) + (index % 3) * 0.035;
+              final asset = _drops[index % _drops.length];
+
+              return Positioned(
+                left: x,
+                top: y,
+                child: Opacity(
+                  opacity: opacity.clamp(0.0, 0.68),
+                  child: Transform.rotate(
+                    angle: isStorm ? 0.32 : 0.22,
+                    child: Image.asset(
+                      asset,
+                      width: dropWidth,
+                      fit: BoxFit.contain,
+                      gaplessPlayback: true,
+                      filterQuality: FilterQuality.medium,
+                    ),
+                  ),
+                ),
+              );
+            }),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _IslandPainter extends CustomPainter {
   const _IslandPainter({required this.weather, required this.progress});
 
@@ -1082,7 +1447,6 @@ class _IslandPainter extends CustomPainter {
     _drawBackdropGlow(canvas, size);
     _drawAtmosphere(canvas, size);
     _drawSea(canvas, size);
-    if (weather.kind != _WeatherKind.sunny) _drawRain(canvas, size);
     _drawSoftVignette(canvas, size);
   }
 
@@ -1244,39 +1608,47 @@ class _IslandPainter extends CustomPainter {
     );
 
     final wavePaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.28)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
+      ..strokeWidth = 1.05
+      ..strokeCap = StrokeCap.round;
     for (var i = 0; i < 5; i++) {
-      final y = size.height * (0.70 + i * 0.045);
+      final y = size.height * (0.50 + i * 0.045);
+      final alpha = (0.11 + (i % 3) * 0.025).clamp(0.0, 0.20);
+      wavePaint.color = Colors.white.withValues(alpha: alpha);
       final path = Path();
-      for (var x = -20.0; x <= size.width + 20; x += 18) {
-        final wave = math.sin((x / 34) + progress * math.pi * 2 + i) * 5;
-        if (x == -20) {
-          path.moveTo(x, y + wave);
+      for (var x = -42.0; x <= size.width + 42; x += 24) {
+        final wave =
+            math.sin((x / 70) + progress * math.pi * 1.05 + i * 0.55) * 1.8;
+        final secondWave =
+            math.cos((x / 118) + progress * math.pi * 0.72 + i) * 0.9;
+        final pointY = y + wave + secondWave;
+        if (x == -42) {
+          path.moveTo(x, pointY);
         } else {
-          path.lineTo(x, y + wave);
+          path.quadraticBezierTo(x - 12, y - wave * 0.45, x, pointY);
         }
       }
       canvas.drawPath(path, wavePaint);
     }
 
-    final reflectionPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.20)
+    final nearWavePaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.11)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.2
+      ..strokeWidth = 1.05
       ..strokeCap = StrokeCap.round;
-    for (var i = 0; i < 3; i++) {
-      final y = size.height * (0.61 + i * 0.035);
-      final path = Path()
-        ..moveTo(size.width * 0.25, y)
-        ..quadraticBezierTo(
-          size.width * 0.50,
-          y + math.sin(progress * math.pi * 2 + i) * 8,
-          size.width * 0.75,
-          y + 3,
-        );
-      canvas.drawPath(path, reflectionPaint);
+    for (var i = 0; i < 2; i++) {
+      final y = size.height * (0.82 + i * 0.052);
+      final path = Path();
+      for (var x = -36.0; x <= size.width + 36; x += 30) {
+        final wave =
+            math.sin((x / 82) + progress * math.pi * 1.18 + i * 0.8) * 2.2;
+        if (x == -36) {
+          path.moveTo(x, y + wave);
+        } else {
+          path.quadraticBezierTo(x - 15, y - wave * 0.7, x, y + wave);
+        }
+      }
+      canvas.drawPath(path, nearWavePaint);
     }
   }
 
@@ -1603,7 +1975,7 @@ class _IslandPainter extends CustomPainter {
             (i * (43.0 + layer * 5) + progress * (speed * 1.7)) %
                 (size.height + 160) -
             80;
-        canvas.drawLine(Offset(x, y), Offset(x - slant, y + length), rainPaint);
+        canvas.drawLine(Offset(x, y), Offset(x + slant, y + length), rainPaint);
       }
     }
   }
@@ -1645,37 +2017,8 @@ class _FrontWeatherPainter extends CustomPainter {
     }
 
     final isStorm = weather.kind == _WeatherKind.storm;
-    final rainPaint = Paint()
-      ..color = const Color(0xFFE9F7FA).withValues(alpha: isStorm ? 0.30 : 0.18)
-      ..strokeWidth = isStorm ? 1.45 : 1.0
-      ..strokeCap = StrokeCap.round;
-    final highlightPaint = Paint()
-      ..color = const Color(0xFFFFFFFF).withValues(alpha: isStorm ? 0.13 : 0.08)
-      ..strokeWidth = isStorm ? 3.4 : 2.4
-      ..strokeCap = StrokeCap.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
-
-    final count = isStorm ? 28 : 18;
-    for (var i = 0; i < count; i++) {
-      final seed = i * 24.91;
-      final length = (isStorm ? 44.0 : 30.0) + math.sin(seed) * 10;
-      final x =
-          (i * 41.0 + progress * (isStorm ? 300 : 200) + math.cos(seed) * 22) %
-              (size.width + 150) -
-          75;
-      final y =
-          (i * 59.0 + progress * (isStorm ? 560 : 380)) % (size.height + 150) -
-          75;
-      final start = Offset(x, y);
-      final end = Offset(x - (isStorm ? 18 : 12), y + length);
-      if (i % (isStorm ? 10 : 16) == 0) {
-        canvas.drawLine(start, end, highlightPaint);
-      }
-      canvas.drawLine(start, end, rainPaint);
-    }
-
     final splashPaint = Paint()
-      ..color = const Color(0xFFD9F4FF).withValues(alpha: isStorm ? 0.16 : 0.09)
+      ..color = const Color(0xFFD9F4FF).withValues(alpha: isStorm ? 0.12 : 0.06)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.8;
     final splashBaseY = size.height * 0.79;
@@ -1720,11 +2063,6 @@ class _IslandReflectionPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final waterRing = Paint()
-      ..color = Colors.white.withValues(alpha: stormy ? 0.24 : 0.32)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.2
-      ..strokeCap = StrokeCap.round;
     final mist = Paint()
       ..shader = RadialGradient(
         colors: [
@@ -1741,16 +2079,6 @@ class _IslandReflectionPainter extends CustomPainter {
       ),
       mist,
     );
-
-    for (var i = 0; i < 4; i++) {
-      final y = size.height * (0.36 + i * 0.13);
-      final phase = progress * math.pi * 2 + i * 0.8;
-      final path = Path()..moveTo(size.width * 0.12, y);
-      for (var x = size.width * 0.12; x <= size.width * 0.88; x += 24) {
-        path.lineTo(x, y + math.sin(x / 28 + phase) * 5);
-      }
-      canvas.drawPath(path, waterRing);
-    }
   }
 
   @override
@@ -1999,11 +2327,28 @@ class _PastelAnimal {
         size: 90,
       );
     }
+    if (normalized.contains('bear') || normalized.contains('deer')) {
+      return const _PastelAnimal(
+        name: 'เพื่อนบนเกาะ',
+        assetPath: 'assets/images/island_parts/animal_red_panda.png',
+        size: 90,
+      );
+    }
     if (normalized.contains('capy') || normalized.contains('otter')) {
       return const _PastelAnimal(
         name: 'คาปิลิ้นเปื่อย',
         assetPath: 'assets/images/island_parts/animal_capybara.png',
         size: 92,
+      );
+    }
+    if (normalized.contains('owl') ||
+        normalized.contains('seal') ||
+        normalized.contains('turtle') ||
+        normalized.contains('rabbit')) {
+      return const _PastelAnimal(
+        name: 'เพื่อนบนเกาะ',
+        assetPath: 'assets/images/island_parts/animal_koala.png',
+        size: 88,
       );
     }
     if (normalized.contains('koala')) {

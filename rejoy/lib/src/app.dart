@@ -529,47 +529,85 @@ class _PrivacyConsentScreen extends StatelessWidget {
           ),
         ),
         child: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.all(22),
-            children: [
-              const SizedBox(height: 24),
-              const Text(
-                'Privacy & Safety Consent',
-                style: TextStyle(
-                  color: Color(0xFF17343C),
-                  fontSize: 30,
-                  fontWeight: FontWeight.w900,
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(22),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 720),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(24, 26, 24, 24),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.92),
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(
+                      color: const Color(0xFFD7ECE7),
+                      width: 1.2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF31525A).withValues(alpha: 0.10),
+                        blurRadius: 32,
+                        offset: const Offset(0, 18),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.verified_user_rounded,
+                        color: Color(0xFF5F9B91),
+                        size: 44,
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'ข้อตกลงความเป็นส่วนตัวและความปลอดภัย',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Color(0xFF17343C),
+                          fontSize: 25,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'ReJoy จะเก็บข้อมูลสนับสนุนสุขภาพใจ เช่น บันทึกอารมณ์ ความในใจ คะแนนคัดกรอง PHQ-9 การกด SOS และสรุปรายงาน PDF เพื่อช่วยให้คุณและผู้เชี่ยวชาญมองเห็นแนวโน้มได้ชัดขึ้น',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Color(0xFF31525A),
+                          height: 1.55,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      const _ConsentBullet(
+                        text:
+                            'ReJoy ไม่ใช่เครื่องมือวินิจฉัยโรค ไม่ทดแทนแพทย์ นักจิตวิทยา บริการฉุกเฉิน หรือการรักษาที่แพทย์สั่ง',
+                      ),
+                      const _ConsentBullet(
+                        text:
+                            'หากอยู่ในภาวะวิกฤตหรือฉุกเฉิน ควรติดต่อคนที่ไว้ใจ สายด่วนสุขภาพจิต 1323 หรือบริการฉุกเฉินในพื้นที่ทันที',
+                      ),
+                      const _ConsentBullet(
+                        text:
+                            'แอปใช้พื้นที่จัดเก็บที่ปลอดภัยสำหรับ token เข้าสู่ระบบ แต่ไฟล์ PDF และภาพหน้าจอที่ส่งออกควรเก็บรักษาอย่างระมัดระวัง',
+                      ),
+                      const _ConsentBullet(
+                        text:
+                            'เมื่อกดยอมรับ คุณอนุญาตให้ ReJoy บันทึกข้อมูลที่กรอก เพื่อใช้กับฟีเจอร์ในแอปและการสร้างรายงานให้แพทย์',
+                      ),
+                      const SizedBox(height: 24),
+                      FilledButton.icon(
+                        onPressed: onAccepted,
+                        icon: const Icon(Icons.check_circle_rounded),
+                        label: const Text('เข้าใจและยอมรับ'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 12),
-              const Text(
-                'ReJoy stores sensitive mental-health support data such as mood logs, diary notes, PHQ-9 screening scores, SOS flags, and clinical PDF summaries. This data is used to help you review patterns with a qualified professional.',
-                style: TextStyle(color: Color(0xFF31525A), height: 1.45),
-              ),
-              const SizedBox(height: 14),
-              const _ConsentBullet(
-                text:
-                    'ReJoy is not a diagnosis tool and does not replace doctors, therapists, emergency services, or prescribed treatment.',
-              ),
-              const _ConsentBullet(
-                text:
-                    'In a crisis or emergency, contact local emergency services, a trusted person, or a qualified crisis hotline immediately.',
-              ),
-              const _ConsentBullet(
-                text:
-                    'Your local app session uses secure storage for login tokens, but exported PDFs and screenshots should be protected by you.',
-              ),
-              const _ConsentBullet(
-                text:
-                    'By continuing, you agree that ReJoy may save your entered data for app features and doctor-report export.',
-              ),
-              const SizedBox(height: 24),
-              FilledButton.icon(
-                onPressed: onAccepted,
-                icon: const Icon(Icons.verified_user_rounded),
-                label: const Text('I understand and agree'),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -621,6 +659,7 @@ class _ReJoyShellState extends State<ReJoyShell> {
   final ReJoySession session = ReJoySession.seed();
   final AuditLogService _auditLog = const AuditLogService();
   final Map<int, Widget> _pageCache = {};
+  int _islandRefreshKey = 0;
   late int selectedIndex;
 
   @override
@@ -679,6 +718,17 @@ class _ReJoyShellState extends State<ReJoyShell> {
         'Clinical escalation: ${level.name}',
         highlight: level == ClinicalRiskLevel.red,
       );
+    });
+  }
+
+  void _selectPage(int index) {
+    if (selectedIndex == index && index != 0) return;
+    setState(() {
+      if (index == 0) {
+        _islandRefreshKey++;
+        _pageCache.remove(0);
+      }
+      selectedIndex = index;
     });
   }
 
@@ -800,7 +850,13 @@ class _ReJoyShellState extends State<ReJoyShell> {
       if (energy != null) session.energy = energy;
       if (crisis != null) session.crisis = crisis;
       if (missionsDone != null) session.missionsDone = missionsDone;
-      if (pageIndex != null) selectedIndex = pageIndex;
+      if (pageIndex != null) {
+        if (pageIndex == 0) {
+          _islandRefreshKey++;
+          _pageCache.remove(0);
+        }
+        selectedIndex = pageIndex;
+      }
       session.addJournal(message, highlight: true);
     });
   }
@@ -810,13 +866,14 @@ class _ReJoyShellState extends State<ReJoyShell> {
       switch (index) {
         case 0:
           return IslandScreen(
+            key: ValueKey('island-$_islandRefreshKey'),
             session: session,
             onMoodSelected: _setMood,
             onCrisisSelected: _setCrisis,
-            onChatSelected: () => setState(() => selectedIndex = 1),
+            onChatSelected: () => _selectPage(1),
             onSosSelected: () {
               _setCrisis(CrisisLevel.urgent);
-              setState(() => selectedIndex = 4);
+              _selectPage(4);
             },
           );
         case 1:
@@ -830,7 +887,7 @@ class _ReJoyShellState extends State<ReJoyShell> {
           return MissionsScreen(
             session: session,
             onEnergySelected: _setEnergy,
-            onGoToIsland: () => setState(() => selectedIndex = 0),
+            onGoToIsland: () => _selectPage(0),
           );
         case 3:
           return ProfileScreen(
@@ -843,6 +900,32 @@ class _ReJoyShellState extends State<ReJoyShell> {
           return const SizedBox.shrink();
       }
     });
+  }
+
+  Widget _buildPageStack() {
+    return Stack(
+      fit: StackFit.expand,
+      children: List.generate(5, (index) {
+        final isActive = selectedIndex == index;
+        return Positioned.fill(
+          child: IgnorePointer(
+            ignoring: !isActive,
+            child: TickerMode(
+              enabled: isActive,
+              child: AnimatedOpacity(
+                opacity: isActive ? 1 : 0,
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeInOutCubic,
+                child: Offstage(
+                  offstage: !isActive,
+                  child: RepaintBoundary(child: _pageForIndex(index)),
+                ),
+              ),
+            ),
+          ),
+        );
+      }),
+    );
   }
 
   int _visibleNavIndex() {
@@ -866,7 +949,7 @@ class _ReJoyShellState extends State<ReJoyShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _pageForIndex(selectedIndex),
+      body: _buildPageStack(),
       floatingActionButton: selectedIndex == 3
           ? FloatingActionButton.extended(
               onPressed: _openDemoSandbox,
@@ -877,7 +960,7 @@ class _ReJoyShellState extends State<ReJoyShell> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _visibleNavIndex(),
         onDestinationSelected: (value) =>
-            setState(() => selectedIndex = _pageIndexFromVisibleNav(value)),
+            _selectPage(_pageIndexFromVisibleNav(value)),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.public), label: 'Island'),
           NavigationDestination(icon: Icon(Icons.checklist), label: 'Missions'),

@@ -44,6 +44,29 @@ async function register(email, overrides = {}) {
   return response.body;
 }
 
+test("health readiness reports the shared database state", async () => {
+  const response = await request(app).get("/api/health/ready").expect(200);
+
+  assert.equal(response.body.status, "ready");
+  assert.equal(response.body.database, "connected");
+  assert.ok(response.headers["x-request-id"]);
+});
+
+test("readiness remains responsive under concurrent requests", async () => {
+  const startedAt = Date.now();
+  const responses = await Promise.all(
+    Array.from({ length: 50 }, () =>
+      request(app).get("/api/health/ready").expect(200),
+    ),
+  );
+
+  const requestIds = new Set(
+    responses.map((response) => response.headers["x-request-id"]),
+  );
+  assert.equal(requestIds.size, responses.length);
+  assert.ok(Date.now() - startedAt < 5000);
+});
+
 test("auth supports refresh token rotation", async () => {
   const auth = await register("refresh-a@example.com");
 

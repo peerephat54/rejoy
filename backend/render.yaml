@@ -5,7 +5,7 @@ services:
     plan: free
     buildCommand: npm install
     startCommand: npm start
-    healthCheckPath: /api/health
+    healthCheckPath: /api/health/ready
     envVars:
       - key: NODE_ENV
         value: production
@@ -30,7 +30,9 @@ services:
       - key: MONGODB_MAX_POOL_SIZE
         value: 10
       - key: MONGODB_MIN_POOL_SIZE
-        value: 1
+        value: 0
+      - key: MONGODB_MAX_CONNECTING
+        value: 2
       - key: MONGODB_MAX_IDLE_TIME_MS
         value: 60000
       - key: MONGODB_WAIT_QUEUE_TIMEOUT_MS
@@ -42,4 +44,12 @@ services:
       - key: MONGODB_CONNECT_TIMEOUT_MS
         value: 10000
       - key: MONGODB_HEARTBEAT_FREQUENCY_MS
+        value: 10000
+      - key: REQUEST_TIMEOUT_MS
+        value: 30000
+      - key: KEEP_ALIVE_TIMEOUT_MS
+        value: 65000
+      - key: HEADERS_TIMEOUT_MS
+        value: 66000
+      - key: SHUTDOWN_TIMEOUT_MS
         value: 10000

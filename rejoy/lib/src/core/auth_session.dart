@@ -23,8 +23,15 @@ class AuthSession {
 
   static Future<void> initialize() async {
     final prefs = await SharedPreferences.getInstance();
-    _token = await _secureStorage.read(key: _tokenKey);
-    _refreshToken = await _secureStorage.read(key: _refreshTokenKey);
+    try {
+      _token = await _secureStorage.read(key: _tokenKey);
+      _refreshToken = await _secureStorage.read(key: _refreshTokenKey);
+    } catch (_) {
+      // Demo/debug APKs on some Android devices can fail secure-storage init.
+      // Fall back to local prefs so the app remains usable for presentation.
+      _token = prefs.getString(_tokenKey);
+      _refreshToken = prefs.getString(_refreshTokenKey);
+    }
     _userId = prefs.getString(_userIdKey);
     _email = prefs.getString(_emailKey);
 
@@ -52,9 +59,17 @@ class AuthSession {
     required String email,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    await _secureStorage.write(key: _tokenKey, value: token);
+    try {
+      await _secureStorage.write(key: _tokenKey, value: token);
+    } catch (_) {
+      await prefs.setString(_tokenKey, token);
+    }
     if (refreshToken != null && refreshToken.isNotEmpty) {
-      await _secureStorage.write(key: _refreshTokenKey, value: refreshToken);
+      try {
+        await _secureStorage.write(key: _refreshTokenKey, value: refreshToken);
+      } catch (_) {
+        await prefs.setString(_refreshTokenKey, refreshToken);
+      }
       _refreshToken = refreshToken;
     }
     await prefs.setString(_userIdKey, userId);
@@ -81,9 +96,14 @@ class AuthSession {
 
   static Future<void> clear() async {
     final prefs = await SharedPreferences.getInstance();
-    await _secureStorage.delete(key: _tokenKey);
-    await _secureStorage.delete(key: _refreshTokenKey);
+    try {
+      await _secureStorage.delete(key: _tokenKey);
+      await _secureStorage.delete(key: _refreshTokenKey);
+    } catch (_) {
+      // Ignore secure-storage cleanup failures and still clear local session.
+    }
     await prefs.remove(_tokenKey);
+    await prefs.remove(_refreshTokenKey);
     await prefs.remove(_userIdKey);
     await prefs.remove(_emailKey);
     await prefs.remove(_lastActiveAtKey);
