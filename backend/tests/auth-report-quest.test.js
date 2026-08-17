@@ -52,6 +52,65 @@ test("health readiness reports the shared database state", async () => {
   assert.ok(response.headers["x-request-id"]);
 });
 
+test("protected runtime metrics expose aggregate data only", async () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+  const originalHealthKey = process.env.HEALTH_CHECK_KEY;
+
+  try {
+    process.env.NODE_ENV = "production";
+    process.env.HEALTH_CHECK_KEY = "metrics-test-key";
+
+    await request(app).get("/api/health/metrics").expect(404);
+    const response = await request(app)
+      .get("/api/health/metrics")
+      .set("x-health-check-key", "metrics-test-key")
+      .expect(200);
+
+    assert.equal(response.body.status, "ok");
+    assert.ok(response.body.requests >= 1);
+    assert.equal(response.body.privacy.includes("no request body"), true);
+    assert.equal(Object.hasOwn(response.body, "messages"), false);
+  } finally {
+    if (originalNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = originalNodeEnv;
+    }
+
+    if (originalHealthKey === undefined) {
+      delete process.env.HEALTH_CHECK_KEY;
+    } else {
+      process.env.HEALTH_CHECK_KEY = originalHealthKey;
+    }
+  }
+});
+
+test("daily chat topic is deterministic and companion intercepts red flags", async () => {
+  const auth = await register("chat-safety@example.com");
+
+  const firstTopic = await request(app)
+    .get("/api/chat/daily-topic?date=2026-08-17")
+    .set("Authorization", `Bearer ${auth.token}`)
+    .expect(200);
+  const secondTopic = await request(app)
+    .get("/api/chat/daily-topic?date=2026-08-17")
+    .set("Authorization", `Bearer ${auth.token}`)
+    .expect(200);
+
+  assert.equal(firstTopic.body.topic, secondTopic.body.topic);
+  assert.ok(firstTopic.body.topic.length > 5);
+
+  const intercepted = await request(app)
+    .post("/api/chat/companion")
+    .set("Authorization", `Bearer ${auth.token}`)
+    .send({ message: "ตอนนี้อยากทำร้ายตัวเอง" })
+    .expect(200);
+
+  assert.equal(intercepted.body.provider, "safety-intercept");
+  assert.equal(intercepted.body.blockedAi, true);
+  assert.equal(intercepted.body.riskLevel, "red");
+});
+
 test("readiness remains responsive under concurrent requests", async () => {
   const startedAt = Date.now();
   const responses = await Promise.all(

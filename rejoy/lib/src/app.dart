@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'core/auth_session.dart';
 import 'core/privacy_consent.dart';
+import 'core/privacy_policy_screen.dart';
 import 'core/rejoy_session.dart';
 import 'core/rejoy_theme.dart';
 import 'features/auth/auth_screen.dart';
@@ -583,7 +584,7 @@ class _PrivacyConsentScreen extends StatelessWidget {
                       const SizedBox(height: 18),
                       const _ConsentBullet(
                         text:
-                            'ReJoy ไม่ใช่เครื่องมือวินิจฉัยโรค ไม่ทดแทนแพทย์ นักจิตวิทยา บริการฉุกเฉิน หรือการรักษาที่แพทย์สั่ง',
+                            'ReJoy ไม่วินิจฉัยโรค ไม่สั่งหรือปรับยา และไม่ทดแทนแพทย์ นักจิตวิทยา บริการฉุกเฉิน หรือการรักษาที่แพทย์สั่ง',
                       ),
                       const _ConsentBullet(
                         text:
@@ -598,6 +599,18 @@ class _PrivacyConsentScreen extends StatelessWidget {
                             'เมื่อกดยอมรับ คุณอนุญาตให้ ReJoy บันทึกข้อมูลที่กรอก เพื่อใช้กับฟีเจอร์ในแอปและการสร้างรายงานให้แพทย์',
                       ),
                       const SizedBox(height: 24),
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const PrivacyPolicyScreen(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.privacy_tip_outlined),
+                        label: const Text('อ่านนโยบายความเป็นส่วนตัวฉบับเต็ม'),
+                      ),
+                      const SizedBox(height: 10),
                       FilledButton.icon(
                         onPressed: onAccepted,
                         icon: const Icon(Icons.check_circle_rounded),

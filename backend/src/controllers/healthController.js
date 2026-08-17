@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Quest = require("../models/Quest");
 const { getMongoPoolConfig } = require("../config/db");
 const { getGeminiConfig } = require("./chatController");
+const { snapshot } = require("../services/runtimeMetrics");
 
 function getHealth(req, res) {
   res.json({
@@ -21,6 +22,15 @@ function getReadiness(req, res) {
     service: "rejoy-backend",
     database: dbReady ? "connected" : "disconnected",
     timestamp: new Date().toISOString(),
+  });
+}
+
+function getRuntimeMetrics(req, res) {
+  res.json({
+    status: "ok",
+    service: "rejoy-backend",
+    privacy: "aggregate-only; no request body, chat text, email, or patient id",
+    ...snapshot(),
   });
 }
 
@@ -53,4 +63,4 @@ async function getDeepHealth(req, res, next) {
   }
 }
 
-module.exports = { getDeepHealth, getHealth, getReadiness };
+module.exports = { getDeepHealth, getHealth, getReadiness, getRuntimeMetrics };

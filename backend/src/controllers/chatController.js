@@ -1,18 +1,20 @@
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
 const DEFAULT_GEMINI_TIMEOUT_MS = 8000;
+const { getDailyTopic } = require("../services/dailyConversationTopics");
 
 const HOTLINE_TEXT =
   "ถ้าตอนนี้ไม่ปลอดภัยหรืออยากคุยกับคนจริง ๆ โทรสายด่วนสุขภาพจิต 1323 ได้เลยนะ เขามีคนรับฟังและช่วยประคองสถานการณ์";
 
 const SAFETY_PROMPT = `
-You are ReJoy Buddy, a gentle Thai teen mental-health companion, not a doctor.
-Speak like a caring friend: warm, concise, non-judgmental, and guilt-free.
-You may support reflection and daily check-ins, but you must not diagnose.
-You must not prescribe, stop, increase, decrease, or change medication.
-If medication is mentioned, say you cannot decide about medicine and suggest asking a doctor, pharmacist, qualified expert, or hotline 1323.
-If the user mentions immediate self-harm danger, encourage staying near a trusted person and contacting hotline 1323 immediately.
-Ask at most one soft follow-up question.
-Keep the reply in Thai and keep it short enough for a mobile chat bubble.
+You are ReJoy Buddy, a supportive Thai friend for everyday conversation. You are not a doctor, therapist, diagnosis tool, or emergency service.
+Use natural, warm Thai suitable for a teenager. Sound like a caring friend who listens, not a lecturer. Keep each reply concise and easy to read in a mobile chat bubble.
+Stay with ordinary daily life. Never turn the conversation into philosophy, motivational preaching, a clinical interview, or a PHQ-9 assessment. The app handles screening separately with deterministic rules.
+Validate the person's feeling without claiming to know exactly how they feel. Do not shame, pressure, guilt, reward dependency, or promise that everything will be fine.
+Ask no more than one gentle and practical follow-up question. When helpful, offer one tiny optional next step using words such as "ถ้าไหว" or "ลองดูไหม".
+Never diagnose a disease, label a risk level, interpret a clinical score, prescribe medicine, or advise starting, stopping, increasing, decreasing, or changing medication.
+If medicine is mentioned, explain briefly that medicine decisions belong to a doctor or pharmacist and offer to help the user write a question for them.
+If immediate self-harm danger appears, prioritize staying near a trusted person and contacting Thailand mental-health hotline 1323 or local emergency services. Do not continue normal conversation.
+Reply in Thai only.
 `;
 
 const PLACEHOLDER_KEYS = new Set([
@@ -114,18 +116,8 @@ async function callGemini({ apiKey, model, timeoutMs, message, history, topic })
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
+    const safeTopic = String(topic || getDailyTopic()).slice(0, 160);
     const contents = [
-      {
-        role: "user",
-        parts: [
-          {
-            text: `${SAFETY_PROMPT}
-Today's daily-life conversation topic is: ${String(topic)}.
-Keep replies grounded in this ordinary-life topic when possible.
-If you ask a follow-up, make it feel like a friend noticing daily life, not a clinical questionnaire.`,
-          },
-        ],
-      },
       ...normalizeHistory(history),
       {
         role: "user",
@@ -141,6 +133,13 @@ If you ask a follow-up, make it feel like a friend noticing daily life, not a cl
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          systemInstruction: {
+            parts: [
+              {
+                text: `${SAFETY_PROMPT}\nหัวข้อชีวิตประจำวันของวันนี้คือ: ${safeTopic}\nเชื่อมบทสนทนากับหัวข้อนี้เมื่อเหมาะสม โดยไม่ฝืนเปลี่ยนเรื่องที่ผู้ใช้กำลังเล่า`,
+              },
+            ],
+          },
           contents,
           generationConfig: {
             temperature: 0.55,
@@ -180,8 +179,9 @@ async function companionChat(req, res, next) {
     const {
       message = "",
       history = [],
-      topic = "ชีวิตประจำวันวันนี้",
+      topic,
     } = req.body;
+    const dailyTopic = String(topic || getDailyTopic()).slice(0, 160);
 
     if (detectRedFlag(message)) {
       return res.json(safetyInterceptionReply());
@@ -192,6 +192,7 @@ async function companionChat(req, res, next) {
       return res.json({
         provider: "fallback",
         geminiConfigured: false,
+        topic: dailyTopic,
         message: fallbackReply(message),
       });
     }
@@ -203,13 +204,14 @@ async function companionChat(req, res, next) {
         timeoutMs: config.timeoutMs,
         message,
         history,
-        topic,
+        topic: dailyTopic,
       });
 
       return res.json({
         provider: "gemini",
         model: config.model,
         geminiConfigured: true,
+        topic: dailyTopic,
         message: aiText || fallbackReply(message),
       });
     } catch (error) {
@@ -217,6 +219,7 @@ async function companionChat(req, res, next) {
       return res.json({
         provider: "fallback",
         geminiConfigured: true,
+        topic: dailyTopic,
         fallbackReason: error.name === "AbortError" ? "timeout" : "provider_error",
         message: fallbackReply(message),
       });
@@ -226,8 +229,18 @@ async function companionChat(req, res, next) {
   }
 }
 
+function dailyTopic(req, res) {
+  const requestedDate = req.query.date ? new Date(req.query.date) : new Date();
+  const date = Number.isNaN(requestedDate.getTime()) ? new Date() : requestedDate;
+  res.json({
+    date: date.toISOString().slice(0, 10),
+    topic: getDailyTopic(date),
+  });
+}
+
 module.exports = {
   companionChat,
+  dailyTopic,
   detectRedFlag,
   fallbackReply,
   getGeminiConfig,

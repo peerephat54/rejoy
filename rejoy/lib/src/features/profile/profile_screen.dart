@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../core/api_config.dart';
 import '../../core/auth_session.dart';
 import '../../core/rejoy_session.dart';
+import '../../core/privacy_policy_screen.dart';
 import '../../services/doctor_pdf_service.dart';
 import '../../services/audit_log_service.dart';
 import '../../services/explainable_scoring_service.dart';
@@ -332,6 +333,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     reportCount: data.reports.length,
                     onExportPdf: () => _exportDoctorPdf(data),
                     exportingPdf: _exportingPdf,
+                    onPrivacyPolicy: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const PrivacyPolicyScreen(),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 14),
                   if (data.user.isClinician) _HospitalDemoCard(user: data.user),
@@ -1010,12 +1018,14 @@ class _HeroCard extends StatelessWidget {
     required this.reportCount,
     required this.onExportPdf,
     required this.exportingPdf,
+    required this.onPrivacyPolicy,
   });
 
   final BackendUser user;
   final int reportCount;
   final VoidCallback onExportPdf;
   final bool exportingPdf;
+  final VoidCallback onPrivacyPolicy;
 
   @override
   Widget build(BuildContext context) {
@@ -1165,6 +1175,18 @@ class _HeroCard extends StatelessWidget {
                     )
                   : const Icon(Icons.picture_as_pdf_rounded),
               label: const Text('พิมพ์ให้หมอ / Export PDF'),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.center,
+            child: TextButton.icon(
+              onPressed: onPrivacyPolicy,
+              icon: const Icon(Icons.privacy_tip_outlined, size: 18),
+              label: const Text('ความเป็นส่วนตัวและข้อจำกัดทางการแพทย์'),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF31525A),
+              ),
             ),
           ),
         ],

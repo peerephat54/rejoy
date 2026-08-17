@@ -16,6 +16,7 @@ const questRoutes = require('./routes/questRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const userRoutes = require('./routes/userRoutes');
 const { errorHandler, notFound } = require('./middleware/errorMiddleware');
+const runtimeMetrics = require('./services/runtimeMetrics');
 
 const app = express();
 
@@ -38,6 +39,16 @@ app.use((req, res, next) => {
   const requestId = req.get('x-request-id') || randomUUID();
   req.requestId = requestId;
   res.set('x-request-id', requestId);
+  next();
+});
+
+app.use((req, res, next) => {
+  const startedAt = process.hrtime.bigint();
+  runtimeMetrics.recordRequestStart();
+  res.once('finish', () => {
+    const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+    runtimeMetrics.recordRequestFinish(res.statusCode, durationMs);
+  });
   next();
 });
 

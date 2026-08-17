@@ -3,6 +3,7 @@ const {
   getDeepHealth,
   getHealth,
   getReadiness,
+  getRuntimeMetrics,
 } = require("../controllers/healthController");
 
 const router = express.Router();
@@ -24,5 +25,6 @@ function requireDeepHealthAccess(req, res, next) {
 router.get("/", getHealth);
 router.get("/ready", getReadiness);
 router.get("/deep", requireDeepHealthAccess, getDeepHealth);
+router.get("/metrics", requireDeepHealthAccess, getRuntimeMetrics);
 
 module.exports = router;

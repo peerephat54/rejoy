@@ -53,7 +53,7 @@ class _ChatScreenState extends State<ChatScreen> {
   int _questionIndex = 0;
 
   static const String _hotlineText =
-      'ถ้าตอนนี้ไม่ปลอดภัยหรืออยากคุยกับคนจริง ๆ โทรสายด่วน 1300 ได้เลยนะ เขามีคนรับฟังตลอด 24 ชั่วโมง';
+      'ถ้าตอนนี้ไม่ปลอดภัยหรืออยากคุยกับคนจริง ๆ โทรสายด่วนสุขภาพจิต 1323 ได้เลยนะ เขามีคนรับฟังตลอด 24 ชั่วโมง';
 
   static const List<_ScreeningPrompt> _prompts = [
     _ScreeningPrompt(
@@ -162,24 +162,55 @@ class _ChatScreenState extends State<ChatScreen> {
             'วันนี้เราคุยเรื่องการพักแบบไม่ต้องรู้สึกผิดกันนะ พักจริงไหม พักแล้วยังคิดวนไหม หรือวันนี้แค่ประคองตัวก็พอ',
         questionLead: 'ถ้ามองผ่านเรื่องการพักของวันนี้',
       ),
+      _DailyChatTopic(
+        title: 'เพลง คลิป หรือสิ่งที่ดูวันนี้',
+        opener:
+            'วันนี้ชวนคุยเรื่องเพลง คลิป หรือสิ่งที่ดูผ่าน ๆ กันนะ มีอะไรที่ทำให้หยุดดู หรืออยากเลื่อนผ่านเร็ว ๆ บ้างไหม',
+        questionLead: 'ถ้ามองผ่านสิ่งที่ได้ฟังหรือดูวันนี้',
+      ),
+      _DailyChatTopic(
+        title: 'การเดินทางและทางที่คุ้นเคย',
+        opener:
+            'วันนี้ชวนคุยเรื่องการเดินทางกันนะ จะเป็นทางไปเรียน ไปทำงาน หรือแค่เดินไปอีกห้องก็ได้ ช่วงไหนรู้สึกเบาหรือเหนื่อยที่สุด',
+        questionLead: 'ถ้ามองผ่านการเดินทางของวันนี้',
+      ),
+      _DailyChatTopic(
+        title: 'อากาศและสิ่งนอกหน้าต่าง',
+        opener:
+            'วันนี้ลองคุยเรื่องอากาศหรือสิ่งที่เห็นรอบตัวกันนะ ไม่ต้องตีความอะไร แค่เล่าว่าเห็นอะไรแล้วรู้สึกยังไงก็พอ',
+        questionLead: 'ถ้ามองผ่านอากาศและสิ่งรอบตัววันนี้',
+      ),
+      _DailyChatTopic(
+        title: 'งานบ้านหรือของที่ค้างอยู่',
+        opener:
+            'วันนี้ชวนคุยเรื่องงานบ้านหรือของที่ค้างอยู่นิดหนึ่งนะ ไม่ได้ชวนให้รีบทำ แค่อยากรู้ว่าชิ้นไหนกินแรงใจมากที่สุด',
+        questionLead: 'ถ้ามองผ่านงานบ้านหรือของที่ค้างอยู่',
+      ),
+      _DailyChatTopic(
+        title: 'ช่วงพักระหว่างวัน',
+        opener:
+            'วันนี้ชวนคุยเรื่องช่วงพักกันนะ ตอนที่หยุดจากเรียนหรืองาน ใจได้พักจริงไหม หรือยังมีเรื่องวิ่งตามมาอยู่',
+        questionLead: 'ถ้ามองผ่านช่วงพักของวันนี้',
+      ),
+      _DailyChatTopic(
+        title: 'ของชิ้นหนึ่งที่ใช้บ่อย',
+        opener:
+            'วันนี้ลองคุยจากของใกล้ตัวกันนะ มีของชิ้นไหนที่หยิบใช้บ่อย หรือช่วยให้วันนี้ง่ายขึ้นนิดหนึ่งบ้าง',
+        questionLead: 'ถ้ามองผ่านของใกล้ตัววันนี้',
+      ),
+      _DailyChatTopic(
+        title: 'สิ่งที่อยากเตรียมให้พรุ่งนี้',
+        opener:
+            'วันนี้ชวนคุยเรื่องพรุ่งนี้แบบไม่ต้องวางแผนใหญ่กันนะ มีอะไรเล็ก ๆ ที่เตรียมไว้แล้วจะช่วยลดแรงตอนตื่นได้บ้าง',
+        questionLead: 'ถ้ามองผ่านสิ่งที่อยากเตรียมให้พรุ่งนี้',
+      ),
     ];
-    return topics[DateTime.now().weekday - 1];
+    final now = DateTime.now();
+    final dayNumber = now.toUtc().difference(DateTime.utc(2026)).inDays;
+    return topics[dayNumber % topics.length];
   }
 
-  String get _todayTopic {
-    return _todayDailyTopic.title;
-    // ignore: dead_code
-    final topics = [
-      'พลังใจตอนตื่นนอน',
-      'สิ่งที่ค้างอยู่ในใจ',
-      'แรงใจในการเจอผู้คน',
-      'จังหวะร่างกายวันนี้',
-      'สิ่งเล็ก ๆ ที่ยังพอไหว',
-      'ความคิดที่วนซ้ำ',
-      'การพักโดยไม่รู้สึกผิด',
-    ];
-    return topics[DateTime.now().weekday - 1];
-  }
+  String get _todayTopic => _todayDailyTopic.title;
 
   Future<void> _load() async {
     try {
@@ -313,7 +344,7 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _messages.add(
           const _ChatMessage.bot(
-            'เรื่องยาเราไม่อยากเดาแทนหมอนะ แต่เราช่วยจดคำถามนี้ให้เอาไปถามแพทย์ เภสัชกร หรือสายด่วน 1300 ได้ ถ้าต้องการ เดี๋ยวเราช่วยเรียบเรียงให้พูดง่ายขึ้น',
+            'เรื่องยาเราไม่อยากเดาแทนหมอนะ แต่เราช่วยจดคำถามนี้ให้เอาไปถามแพทย์ เภสัชกร หรือสายด่วนสุขภาพจิต 1323 ได้ ถ้าต้องการ เดี๋ยวเราช่วยเรียบเรียงให้พูดง่ายขึ้น',
           ),
         );
       });
@@ -588,15 +619,18 @@ class _ChatScreenState extends State<ChatScreen> {
               child: Row(
                 children: [
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: 58,
+                    height: 58,
                     decoration: const BoxDecoration(
                       color: Color(0xFF91CDBB),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
-                      Icons.smart_toy_rounded,
-                      color: Colors.white,
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: Image.asset(
+                        'assets/images/island_parts/rejoy_bot_icon.png',
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
